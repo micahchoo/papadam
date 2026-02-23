@@ -1,0 +1,23 @@
+meta {
+  name: Create Tag
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/tags/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+  ~Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjU3MTIzNjI3LCJqdGkiOiJjNDE1OWMyMDU1MGE0ZTYyOTY2ZWJiZjFkOTIwYWMwNCIsInVzZXJfaWQiOiI3NzZlYjg0Zi05NzJmLTQ3OGItYjNhMC1lYjgxOTVlNTI0ZjUifQ.UxK_Hk3Ymx14Tf7UmwhYRGWtwlCw-5OZgKZGVGMXoPE
+}
+
+body:multipart-form {
+  name:    
+  : 
+  : 
+}

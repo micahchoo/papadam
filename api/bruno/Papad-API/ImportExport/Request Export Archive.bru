@@ -1,0 +1,23 @@
+meta {
+  name: Request Export Archive
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{base_url}}/export/
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+  	"type":"archive",
+  	"id": "633ebce9-1241-4e11-bcba-1e14c3bbbed0"
+  }
+}

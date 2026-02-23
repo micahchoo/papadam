@@ -1,0 +1,15 @@
+meta {
+  name: Instance User Stats
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{base_url}}/instanceuserstats/
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+}

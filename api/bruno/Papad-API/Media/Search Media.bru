@@ -1,0 +1,20 @@
+meta {
+  name: Search Media
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{ base_url }}/archive/?search=gender
+  body: formUrlEncoded
+  auth: none
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+  Authorization: Token {{auth_token}}
+}
+
+body:form-urlencoded {
+  : 
+}

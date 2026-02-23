@@ -1,0 +1,100 @@
+{% load static %}
+
+{% block static %}
+<script src="{% static 'js/edit_collection_media_details.js' %}"></script>
+{% endblock static %}
+<div class="container">
+  <div class="flex items-center gap-1 text-blue-500">
+    <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="20" height="20" viewBox="0,0,256,256"
+      style="fill:#228BE6;">
+      <g fill="#228be6" fill-rule="nonzero" stroke="none" stroke-width="1" stroke-linecap="butt"
+        stroke-linejoin="miter" stroke-miterlimit="10" stroke-dasharray="" stroke-dashoffset="0" font-family="none"
+        font-weight="none" font-size="none" text-anchor="none" style="mix-blend-mode: normal">
+        <g transform="scale(10.66667,10.66667)">
+          <path
+            d="M12,2c-0.26712,0.00003 -0.52312,0.10694 -0.71094,0.29688l-10.08594,8.80078c-0.12774,0.09426 -0.20313,0.24359 -0.20312,0.40234c0,0.27614 0.22386,0.5 0.5,0.5h2.5v8c0,0.552 0.448,1 1,1h4c0.552,0 1,-0.448 1,-1v-6h4v6c0,0.552 0.448,1 1,1h4c0.552,0 1,-0.448 1,-1v-8h2.5c0.27614,0 0.5,-0.22386 0.5,-0.5c0.00001,-0.15876 -0.07538,-0.30808 -0.20312,-0.40234l-10.08008,-8.79492c-0.00194,-0.00196 -0.0039,-0.00391 -0.00586,-0.00586c-0.18782,-0.18994 -0.44382,-0.29684 -0.71094,-0.29687z">
+          </path>
+        </g>
+      </g>
+    </svg>
+    <!-- Home Link -->
+    <a href="/ui/" class="hover:text-gray-700 transition">Home</a>
+    <span class="mx-2">/</span> <!-- Separator -->
+    <!-- Collection Name with Link -->
+    <a :href="'/ui/collection/' + collectionMediaDetails.group.id + '/'" class="text-blue-500 hover:text-gray-700 transition">
+      <span x-text="collectionMediaDetails.group.name"></span>
+    </a>
+    <span class="mx-2">/</span> <!-- Separator -->
+    <!-- Media Name -->
+    <span x-text="collectionMediaDetails.name" class="text-gray-700"></span>
+  </div>
+</div>
+
+<!-- Adding a little space below to look good and even -->
+<div class="mt-4"></div>
+
+<!-- Full-width grid container -->
+<div class="grid grid-cols-1 gap-4" x-data="{ open: true, showOptions: false}">
+  <!-- Collapsible Section -->
+  <div class="bg-white rounded-lg shadow p-4">
+    <!-- Title - Click to toggle the collapsible content -->
+    <div class="flex justify-between items-center border-b pb-2 mb-2">
+      <h2 class="text-lg font-semibold capitalize" x-text="collectionMediaDetails.name"></h2>
+      <div class="flex items-center">
+        <!-- Collapsible Button -->
+        <button @click="open = !open" class="text-gray-500 hover:text-gray-700 p-2 focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" x-bind:class="{ 'rotate-180': open }" class="h-6 w-6 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        <!-- More Options Button -->
+        <div x-show="isAuthCollection()" class="relative" @click.away="showOptions = false">
+          <!-- More Options Button -->
+          <button @click="showOptions = !showOptions" class="text-gray-500 hover:text-gray-700 p-2 focus:outline-none">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path d="M6 10.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm6 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm6 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+            </svg>
+          </button>
+          <!-- Dropdown Menu -->
+<div x-show="showOptions" x-cloak class="absolute right-0 w-48 py-2 mt-2 bg-white rounded-md shadow-xl z-10" x-data="putCollectionMediaDetails()" x-init="init()">
+  <!-- Edit Media Option with Pencil Icon -->
+  <a href="#" @click="editMedia" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"></path><polygon points="18 2 22 6 12 16 8 16 8 12 18 2"></polygon></svg>
+    &nbsp;Edit Media
+  </a>
+
+  <!-- Delete Media Option with Trash Icon -->
+  <a href="#" @click="deleteMedia" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+    &nbsp;Delete Media
+  </a>
+</div>
+
+        </div>
+      </div>
+    </div>
+    <!-- Collapsible Content -->
+    <div 
+      x-show="open"
+      x-transition:enter="collapsible-enter-active"
+      x-transition:enter-start="collapsible-enter-start"
+      x-transition:enter-end="collapsible-enter-end"
+      x-transition:leave="collapsible-leave-active"
+      x-transition:leave-start="collapsible-leave-start"
+      x-transition:leave-end="collapsible-leave-to"
+      x-cloak
+      class="collapsible-content">
+      <p x-html="collectionMediaDetails.description"></p>
+      <!-- Tags/Hashtags -->
+      <div class="flex flex-wrap gap-2">
+        <template x-for="tag in collectionMediaDetails.tags">
+          <div class="h-[22px] pl-[13px] pr-[12.80px] py-[3px] bg-blue-400 rounded-2xl justify-center items-center inline-flex mx-1 my-1">
+          <div class="h-4 text-white text-sm font-semibold font-['Roboto'] leading-tight"
+            x-text="tag.name"></div>
+        </div> 
+       </template>
+      </div>
+    </div>
+  </div>
+</div>

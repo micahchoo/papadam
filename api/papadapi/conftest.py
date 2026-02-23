@@ -1,0 +1,145 @@
+"""
+papadam — pytest fixtures and factory-boy factories.
+
+All tests import from here via pytest's conftest auto-discovery.
+Factories are in factories.py (same directory); this file wires them to fixtures.
+"""
+
+import pytest
+from rest_framework.test import APIClient
+
+from papadapi.users.models import User
+from papadapi.common.models import Group, Tags
+from papadapi.archive.models import MediaStore
+from papadapi.annotate.models import Annotation
+
+
+# ── Factories (inline — move to factories.py when they grow large) ────────────
+
+import factory
+from factory.django import DjangoModelFactory
+
+
+class UserFactory(DjangoModelFactory):
+    class Meta:
+        model = User
+
+    username = factory.Sequence(lambda n: f"user_{n}")
+    email = factory.LazyAttribute(lambda o: f"{o.username}@example.com")
+    first_name = factory.Faker("first_name")
+    last_name = factory.Faker("last_name")
+    password = factory.PostGenerationMethodCall("set_password", "testpass123")
+
+
+class TagFactory(DjangoModelFactory):
+    class Meta:
+        model = Tags
+
+    name = factory.Sequence(lambda n: f"tag_{n}")
+    count = 1
+
+
+class GroupFactory(DjangoModelFactory):
+    class Meta:
+        model = Group
+
+    name = factory.Sequence(lambda n: f"group_{n}")
+    description = factory.Faker("sentence")
+    is_public = True
+    is_active = True
+
+
+class MediaStoreFactory(DjangoModelFactory):
+    class Meta:
+        model = MediaStore
+
+    name = factory.Sequence(lambda n: f"media_{n}")
+    description = factory.Faker("sentence")
+    is_public = True
+    group = factory.SubFactory(GroupFactory)
+    orig_name = factory.LazyAttribute(lambda o: f"{o.name}.mp3")
+    orig_size = 1024 * 1024
+    file_extension = ".mp3"
+    media_processing_status = "Yet to process"
+
+
+class AnnotationFactory(DjangoModelFactory):
+    class Meta:
+        model = Annotation
+
+    media_reference_id = factory.LazyAttribute(
+        lambda o: f"http://example.com/api/v1/archive/{o.media.uuid}/"
+        if hasattr(o, "media") else "http://example.com/api/v1/archive/test/"
+    )
+    media_target = "t=0,10"
+    annotation_text = factory.Faker("sentence")
+    is_public = True
+    group = factory.SubFactory(GroupFactory)
+
+
+# ── Fixtures ──────────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def user(db):
+    return UserFactory()
+
+
+@pytest.fixture
+def admin_user(db):
+    return UserFactory(is_staff=True, is_superuser=True)
+
+
+@pytest.fixture
+def group(db):
+    return GroupFactory()
+
+
+@pytest.fixture
+def group_with_member(db, user):
+    g = GroupFactory()
+    g.users.add(user)
+    return g
+
+
+@pytest.fixture
+def tag(db):
+    return TagFactory()
+
+
+@pytest.fixture
+def media(db, group):
+    return MediaStoreFactory(group=group)
+
+
+@pytest.fixture
+def annotation(db, media, group):
+    return AnnotationFactory(
+        media_reference_id=f"http://testserver/api/v1/archive/{media.uuid}/",
+        group=group,
+    )
+
+
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+
+@pytest.fixture
+def auth_client(api_client, user):
+    """Authenticated DRF test client (JWT)."""
+    from rest_framework_simplejwt.tokens import RefreshToken
+    refresh = RefreshToken.for_user(user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    return api_client
+
+
+@pytest.fixture
+def member_client(api_client, group_with_member):
+    """Client authenticated as a member of group_with_member."""
+    user = group_with_member.users.first()
+    from rest_framework_simplejwt.tokens import RefreshToken
+    refresh = RefreshToken.for_user(user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    api_client.user = user
+    api_client.group = group_with_member
+    return api_client

@@ -1,0 +1,21 @@
+meta {
+  name: Delete User from Group
+  type: http
+  seq: 14
+}
+
+put {
+  url: {{base_url}}/group/remove_user/7/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  user: 81da5f89-89c3-4257-9f89-7beb976b47fc
+  : 
+}

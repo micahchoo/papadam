@@ -1,0 +1,15 @@
+meta {
+  name: Group Annotation Stats
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{base_url}}/groupannotationstats/2/
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+}

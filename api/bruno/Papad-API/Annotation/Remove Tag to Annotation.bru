@@ -1,0 +1,23 @@
+meta {
+  name: Remove Tag to Annotation
+  type: http
+  seq: 13
+}
+
+put {
+  url: {{ base_url }}/annotate/remove_tag/d7b27cb4-7fcf-4ac5-a56d-de489e7266cd/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Token {{auth_token}}
+}
+
+body:json {
+  {
+  
+  "tags": ["24"]
+  }
+}

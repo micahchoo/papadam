@@ -1,0 +1,21 @@
+meta {
+  name: Remove Custom Question to Group
+  type: http
+  seq: 12
+}
+
+put {
+  url: {{base_url}}/group/remove_question/10/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  question_id: 11
+  remove_existing_data: True
+}

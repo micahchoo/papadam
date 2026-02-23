@@ -1,0 +1,192 @@
+version: "3.9"
+
+# papadam — Docker Compose stack
+#
+# Profiles:
+#   (none)         — postgres, redis, api, bg-app, crdt
+#   webserver      — caddy (automatic HTTPS + SPA serving)
+#   minio          — MinIO object storage + auto bucket init
+#   transcribe     — Whisper transcription worker
+#   docs           — MkDocs documentation site
+#   backup         — automated daily PostgreSQL backups
+#
+# Quickstart:
+#   docker compose --profile webserver --profile minio up -d
+
+x-api-base: &api-base
+  build: ../api
+  env_file: service_config.env
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+
+  # ── Data ────────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: papadam
+      POSTGRES_USER: papadam
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "papadam"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:latest
+    profiles: [minio]
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Automatically creates the 'papadam' bucket with public read policy.
+  # Replaces the manual MinIO console step from papad-docker.
+  minio-init:
+    image: quay.io/minio/mc:latest
+    profiles: [minio]
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+        mc mb --ignore-existing local/papadam &&
+        mc anonymous set public local/papadam &&
+        echo bucket_ready
+      "
+    env_file: service_config.env
+
+  # ── Application ─────────────────────────────────────────────────────────
+
+  api:
+    <<: *api-base
+    restart: unless-stopped
+    command: bash startup.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  bg-app:
+    <<: *api-base
+    restart: unless-stopped
+    command: python -m arq papadapi.worker.WorkerSettings
+    healthcheck:
+      test: ["CMD", "python", "-c", "import arq; print('ok')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  crdt:
+    build: ../crdt
+    restart: unless-stopped
+    env_file: service_config.env
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:1234/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Optional profiles ────────────────────────────────────────────────────
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: [webserver]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../ui/build:/srv/ui:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      crdt:
+        condition: service_healthy
+
+  transcribe:
+    build: ../transcribe
+    profiles: [transcribe]
+    restart: unless-stopped
+    env_file: service_config.env
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  docs:
+    build: ../docs
+    profiles: [docs]
+    restart: unless-stopped
+
+  backup:
+    image: prodrigestivill/postgres-backup-local:16
+    profiles: [backup]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: papadam
+      POSTGRES_USER: papadam
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    volumes:
+      - ./backups:/backups
+
+volumes:
+  pg-data:
+  redis-data:
+  minio-data:
+  caddy-data:
+  caddy-config:

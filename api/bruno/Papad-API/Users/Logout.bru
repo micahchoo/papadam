@@ -1,0 +1,15 @@
+meta {
+  name: Logout
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{login_url}}/token/logout
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+}

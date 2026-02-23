@@ -1,0 +1,193 @@
+# papadam/api — Python tooling configuration
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "S",   # bandit (security)
+    "T20", # no print() in source
+    "RUF", # ruff-specific
+]
+ignore = [
+    "S101",  # assert in tests is fine
+    "B008",  # DRF uses function calls as default args (e.g. openapi_schema_field)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/tests/*"  = ["S", "T20"]   # tests can use assert and print
+"*/test*"    = ["S", "T20"]
+"conftest.py"= ["S"]
+"manage*.py" = ["T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "users", "archive", "annotate", "common",
+    "importexport", "crdt", "events", "exhibit", "media_relation",
+]
+
+# ── mypy ──────────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+ignore_missing_imports = true
+# Progressive strictness — tighten per phase
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_reexport = true
+
+[[tool.mypy.overrides]]
+module = "*.migrations.*"
+ignore_errors = true
+
+[tool.django-stubs]
+django_settings_module = "papadapi.config.local"
+
+# ── pytest ────────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "papadapi.config.test"
+python_files  = ["test_*.py", "*_test.py", "tests.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--tb=short",
+    "--cov=papadapi",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-fail-under=80",   # CI fails below 80% coverage
+    "-p", "no:warnings",
+]
+markers = [
+    "slow: marks tests as slow (deselect with -m 'not slow')",
+    "integration: marks tests requiring external services",
+]
+
+# ── coverage ──────────────────────────────────────────────────────────────────
+
+[tool.coverage.run]
+source = ["papadapi"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/test_*",
+    "manage*.py",
+    "*/config/*",
+    "*/wsgi.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+# ── import-linter (architecture as code) ─────────────────────────────────────
+#
+# Enforces the dependency graph between Django apps.
+# A contract violation fails CI exactly like a failing test.
+#
+# Allowed dependency direction (layered):
+#
+#   common  ←  users  ←  archive  ←  annotate  ←  exhibit
+#                                               ←  media_relation
+#              crdt   ←  (archive + annotate)
+#              events ←  (common only)
+#
+# No app may import from a layer above it.
+
+[tool.importlinter]
+root_package = "papadapi"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "common is a leaf — it may not import from any other app"
+type = "forbidden"
+source_modules = ["papadapi.common"]
+forbidden_modules = [
+    "papadapi.users",
+    "papadapi.archive",
+    "papadapi.annotate",
+    "papadapi.importexport",
+    "papadapi.exhibit",
+    "papadapi.media_relation",
+    "papadapi.crdt",
+    "papadapi.events",
+]
+
+[[tool.importlinter.contracts]]
+name = "users may only import from common"
+type = "layers"
+layers = ["papadapi.users", "papadapi.common"]
+
+[[tool.importlinter.contracts]]
+name = "archive may only import from common and users"
+type = "forbidden"
+source_modules = ["papadapi.archive"]
+forbidden_modules = [
+    "papadapi.annotate",
+    "papadapi.importexport",
+    "papadapi.exhibit",
+    "papadapi.media_relation",
+    "papadapi.crdt",
+]
+
+[[tool.importlinter.contracts]]
+name = "annotate may only import from common, users, archive"
+type = "forbidden"
+source_modules = ["papadapi.annotate"]
+forbidden_modules = [
+    "papadapi.importexport",
+    "papadapi.exhibit",
+    "papadapi.crdt",
+]
+
+[[tool.importlinter.contracts]]
+name = "crdt app may not import from exhibit or media_relation"
+type = "forbidden"
+source_modules = ["papadapi.crdt"]
+forbidden_modules = [
+    "papadapi.exhibit",
+    "papadapi.media_relation",
+    "papadapi.importexport",
+]
+
+[[tool.importlinter.contracts]]
+name = "events app is a leaf — only imports from common"
+type = "forbidden"
+source_modules = ["papadapi.events"]
+forbidden_modules = [
+    "papadapi.archive",
+    "papadapi.annotate",
+    "papadapi.exhibit",
+    "papadapi.media_relation",
+    "papadapi.crdt",
+    "papadapi.importexport",
+]
+
+[[tool.importlinter.contracts]]
+name = "no circular imports anywhere"
+type = "independence"
+modules = [
+    "papadapi.common",
+    "papadapi.users",
+    "papadapi.archive",
+    "papadapi.annotate",
+    "papadapi.importexport",
+    "papadapi.exhibit",
+    "papadapi.media_relation",
+    "papadapi.crdt",
+    "papadapi.events",
+]

@@ -1,0 +1,21 @@
+meta {
+  name: Request Import Archive
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{base_url}}/import/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+  Content-Type: multipart/form-data
+}
+
+body:multipart-form {
+  upload: 
+  ie_metadata: {"type":"archive","import_into_group":9}
+}

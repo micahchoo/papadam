@@ -1,0 +1,24 @@
+meta {
+  name: Update Annotation
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{base_url}}/annotate/d2d75b65-09b8-4491-b64f-03e31beeb763/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  annotation_text: Updated annotation tet
+  media_target: t=338,350
+  tags: idea,effort,aspiration,inspiration,movement
+  annotation_image: 
+  ~media_reference_id: cb95607d-4748-49ae-8d69-bf4dd4868421
+}

@@ -1,0 +1,15 @@
+meta {
+  name: List of Media
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{ base_url }}/archive/?group=1&page_size=20
+  body: none
+  auth: none
+}
+
+headers {
+  Content-Type: application/octet-stream
+}

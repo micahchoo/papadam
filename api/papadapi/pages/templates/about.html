@@ -1,0 +1,36 @@
+{% extends '_base.html' %}
+{% load static %}
+{% block content %}
+
+<main class="bg-gray-100 min-h-screen flex flex-col items-center pt-10 pb-20"> <!-- Adjusted padding top and bottom -->
+    <section class="text-center text-gray-700 w-full max-w-4xl px-4"> <!-- Set max-width and horizontal padding -->
+        <img src="{% static 'images/plasma_about.png' %}" alt="Plasma Logo" class="mb-4 mx-auto" style="width: 30%; min-width: 150px;" />
+
+        <h2 class="font-light text-3xl text-brand-dark leading-snug mb-4">Media Fragment Annotator</h2>
+        
+        <div class="m-5 p-5">
+            <p class="font-thin text-2xl text-brand-dark leading-snug">
+                Participatory Listening and Sense Making of Archives (PLASMA) is a project of Janastu collective – who explore inclusive open source technology solutions. Using Plasma, communities can archive media, annotate fragments, discover relationships and share their knowledge.
+            </p>
+            <p class="font-thin text-2xl text-brand-dark leading-snug mt-4">
+                Follow Plasma development & other projects at
+                <a href="//open.janastu.org/projects" class="underline" target="_blank" rel="noopener noreferrer">open.janastu.org/projects</a>.
+            </p>
+        </div>
+        
+        <div class="mt-4 mb-10"> <!-- Adjusted margin bottom -->
+            <p class="font-thin text-2xl text-brand-dark leading-snug">
+                Janastu’s online instance is at
+                <a href="//stories.janastu.org" target="_blank" rel="noopener noreferrer" class="underline">stories.janastu.org</a>
+                and offline one at
+                <a href="//papad.iruway.in" target="_blank" rel="noopener noreferrer" class="underline">papad.iruway.in</a>
+                (reachable from COWMesh).
+            </p>
+            <p class="font-thin text-2xl text-brand-dark leading-snug mt-4">
+                Typical use cases are: offline archives, oral histories, and media libraries.
+            </p>
+        </div>
+    </section>
+</main>
+
+{% endblock content %}

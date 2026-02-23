@@ -1,0 +1,23 @@
+meta {
+  name: Add Tags to Media
+  type: http
+  seq: 16
+}
+
+put {
+  url: {{ base_url }}/archive/add_tag/8fed6965-948d-40de-8f93-fa25d12362a7/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Token {{auth_token}}
+}
+
+body:json {
+  {
+  
+  "tags": ["rights"]
+  }
+}

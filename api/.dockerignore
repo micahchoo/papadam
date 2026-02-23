@@ -1,0 +1,11 @@
+.*
+!.coveragerc
+!.env
+miniodata/
+service_config.env
+sonar-project.properties
+papad-api.code-workspace
+docker-compose.yml
+Dockerfile
+.git/
+db.sqlite3

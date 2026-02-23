@@ -1,0 +1,16 @@
+meta {
+  name: Search User
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{base_url}}/users/search/?search=demo
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Token {{auth_token}}
+}

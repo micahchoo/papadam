@@ -1,0 +1,18 @@
+site_name: PAPAD
+site_description: Papad Documentation
+repo_url: https://gitlab.com/servelots/papad/papad-docs
+site_dir: site
+copyright: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
+dev_addr: 0.0.0.0:8001
+
+nav:
+  - Home: 'index.md'
+  - How to Use:
+    - Authentication: 'howtouse/authentication'
+    - Dashboard: 'howtouse/dashboard'
+    - Groups: 'howtouse/groups'
+    - Upload Audio/Video: 'howtouse/uploadmedia'
+    - Annotation: 'howtouse/annotate'
+    - Search: 'howtouse/search'
+  - Instance Admin:
+    - Creating superuser : admin/create_admin_user.md

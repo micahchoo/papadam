@@ -1,0 +1,25 @@
+meta {
+  name: Create New media
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{base_url}}/archive/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  name: 2 custom questions
+  description: Introduction to CRDT
+  upload: 
+  tags: permaculture,iruway
+  group: 9
+  extra_group_response: {"answers":[{"question_id":20,"response":"Custom Response 1"},{"question_id":21,"response":"Custom Response 2"}]}
+}

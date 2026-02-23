@@ -1,0 +1,25 @@
+meta {
+  name: Create User
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{login_url}}/users/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+  	"username": "iruway",
+  	"password": "slots@3354",
+  	"email": "team@servelots.com",
+  	"first_name": "Iruway",
+  	"last_name": "user"
+  }
+}

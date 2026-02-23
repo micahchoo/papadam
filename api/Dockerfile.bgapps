@@ -1,0 +1,12 @@
+FROM python:3.12-alpine
+ENV PYTHONUNBUFFERED 1
+
+# Adds our application app to the image
+COPY . /app/
+COPY startup-bgapps.sh /app/
+WORKDIR /app/
+RUN pip install --upgrade pip
+RUN pip install -r requirements/requirements-prod.txt
+
+# Run the production server
+CMD cd /app/ && bash startup-bgapps.sh

@@ -1,0 +1,15 @@
+meta {
+  name: Instance Annotation Stats
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{base_url}}/instanceannotationstats/
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+}

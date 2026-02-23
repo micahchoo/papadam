@@ -1,0 +1,45 @@
+from django.urls import path, re_path
+
+from papadapi.pages.views import ( 
+    CollectionListHomePage,
+    AboutPage,
+    UnauthorisedPage,
+    SignupPage,
+    LoginPage,
+    resetPassword,
+    SearchPage,
+    UploadToArchive,
+    CollectionHomePage,
+    CreateCollectionHomePage,
+    EditCollectionHomePage,
+    EditUserCollectionHomePage,
+    AddQuestionCollectionHomePage,
+    MediaHomePage,
+    CreateMediaHomePage,
+    EditMediaHomePage,
+    DeleteMediaHomePage,
+    CreateMediaAnnotatePage,
+    DeleteMediaAnnotatePage
+)
+
+urlpatterns = [
+    path("", CollectionListHomePage.as_view(),name="home_ui"),
+    path("about/",AboutPage.as_view(), name="about"),
+    path("signup/",SignupPage.as_view(), name="signup"),
+    path("login/",LoginPage.as_view(), name="login"),
+    path("unauthorised/",UnauthorisedPage.as_view(), name="unauthorised"),
+    path("reset_password/",resetPassword.as_view(), name="reset_password"),
+    path("upload/",UploadToArchive.as_view(), name="upload"),
+    path("search/",SearchPage.as_view(), name="search"),
+    path("collection/create/",CreateCollectionHomePage.as_view(), name="collection_create"),
+    path("collection/<int:id>/",CollectionHomePage.as_view(), name="collection"),
+    path("collection/<int:id>/edit/",EditCollectionHomePage.as_view(), name="collection_edit"),
+    path("collection/<int:id>/edit_user/",EditUserCollectionHomePage.as_view(), name="collection_add_user"),
+    path("collection/<int:id>/add_question/",AddQuestionCollectionHomePage.as_view(), name="collection_add_question"),
+    path("collection/<int:id>/media/create/", CreateMediaHomePage.as_view(), name="collection_media_create"),
+    path("collection/<int:id>/media/<str:uuid>/", MediaHomePage.as_view(), name="collection_media"),
+    path("collection/<int:id>/media/<str:uuid>/edit/", EditMediaHomePage.as_view(), name="collection_media_edit"),
+    path("collection/<int:id>/media/<str:uuid>/delete/", DeleteMediaHomePage.as_view(), name="collection_media_delete"),
+    path("collection/<int:id>/media/<str:uuid>/annotate/create/", CreateMediaAnnotatePage.as_view(), name="collection_media_annotate_create"),
+    path("collection/<int:id>/media/<str:uuid>/annotate/<str:annotate_id>/delete/", DeleteMediaAnnotatePage.as_view(), name="collection_media_annotate_delete"),
+]

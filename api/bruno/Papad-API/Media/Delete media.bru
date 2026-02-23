@@ -1,0 +1,15 @@
+meta {
+  name: Delete media
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{ base_url }}/archive/a1a17bc2-9dca-41d2-bc1e-7046a34c6b5f/
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+}

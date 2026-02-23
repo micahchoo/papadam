@@ -1,0 +1,30 @@
+{% extends '_base.html' %}
+{% load static %}
+
+{% block static %}
+  <link href="//vjs.zencdn.net/8.3.0/video-js.min.css" rel="stylesheet">
+  <script src="//vjs.zencdn.net/8.3.0/video.min.js"></script>
+  <script src="{% static 'js/collection_media_details.js' %}"></script>
+{% endblock static %}
+
+{% block content %}
+
+<div class="bg-gray-100 p-4" x-data="getCollectionMediaDetails()">
+  {% include 'partials/archive/mediahome_title.html' %}
+
+  <div class="grid min-h-screen grid-cols-1 md:grid-cols-3 lg:grid-cols-3 md:gap-4 gap-4 mb-4 md:mb-0 bg-gray-100 p-4">
+    <!-- First column with a full-length card and centered video player -->
+    <div class="col-span-1 md:col-span-3 lg:col-span-2 flex flex-col items-center rounded-lg bg-white p-4 shadow" x-init="init">
+      {% include 'partials/collection/collection_media_details.html' %}
+    </div>
+
+    <!-- Annotation Listing Column starts here -->
+    <div x-init="getAnnotations" class="col-span-1 md:col-span-3 lg:col-span-1 overflow-auto rounded-lg bg-white p-4 shadow" style="max-height: calc(100vh - 2rem);">
+      {% include 'partials/collection/collection_media_annotations.html' %}
+    </div>
+    {% include 'partials/common/loader.html' %}
+
+  </div>
+</div>
+    
+{% endblock %}

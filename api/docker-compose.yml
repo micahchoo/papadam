@@ -1,0 +1,47 @@
+version: '3.3'
+services:
+  web:
+    restart: always
+    env_file: ./service_config.env
+    build: .
+    image: janastu/papad-backend:2.7
+    command: >
+      bash -c " cd /app/ && pip install -r requirements/requirements-dev.txt &&
+               ./manage.py migrate &&
+               ./manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./:/app
+    ports:
+      - "8009:8000"
+    depends_on:
+      - miniostorage
+  bg-app:
+    restart: always
+    env_file: ./service_config.env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: janastu/papad-backend:2.7
+    command: >
+      bash -c " cd /app/ && pip install -r requirements-dev.txt &&
+               ./manage.py migrate &&
+               ./manage.py process_tasks"
+    volumes:
+      - ./:/app
+  miniostorage:
+    ports:
+        - '9001:9001'
+        - '9000:9000'
+    env_file:
+      - ./service_config.env
+    volumes:
+        - './miniodata/data:/data'
+    image: quay.io/minio/minio
+    command: server /data --console-address="0.0.0.0:9001"
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: always
+    ports:
+      - 1025:1025
+      - 8025:8025

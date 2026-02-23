@@ -1,0 +1,21 @@
+meta {
+  name: Request Import Annotation
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{base_url}}/import/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+  Content-Type: multipart/form-data
+}
+
+body:multipart-form {
+  upload: 
+  ie_metadata: {"type":"annotation","import_for_media":"8e69cd3b-4a2e-414c-a713-fb7f4ffc19bb"}
+}

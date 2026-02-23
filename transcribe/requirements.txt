@@ -1,0 +1,4 @@
+openai-whisper==20231117
+arq==0.26.1
+structlog==24.4.0
+httpx==0.27.2

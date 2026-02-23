@@ -1,0 +1,25 @@
+meta {
+  name: Create Group
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{base_url}}/group/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  name: Temp Group
+  description: Delete group
+  users: 
+  group_extra_questions: {"extra":[{"question":"Author","mandatory":true,"type":"text"}]}
+  delete_wait_for: 0
+  is_public: False
+}

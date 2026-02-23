@@ -1,0 +1,24 @@
+meta {
+  name: Update metadata of an archive
+  type: http
+  seq: 14
+}
+
+put {
+  url: {{ base_url }}/archive/91e2d13d-917e-436b-9305-9952827de72c/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Token {{auth_token}}
+}
+
+body:json {
+  {
+  	
+  "name":"Updated name comes here",
+  "description": "Updated description"
+  }
+}

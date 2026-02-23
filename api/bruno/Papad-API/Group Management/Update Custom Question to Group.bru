@@ -1,0 +1,21 @@
+meta {
+  name: Update Custom Question to Group
+  type: http
+  seq: 13
+}
+
+put {
+  url: {{base_url}}/group/update_question/4/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  question_id: 3
+  question: New Name
+}

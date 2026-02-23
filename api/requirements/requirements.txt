@@ -1,0 +1,42 @@
+# Core
+pytz
+Django==4.2
+gunicorn
+Pillow
+
+# For the persistence stores
+psycopg2-binary==2.9.9
+dj-database-url
+
+# Model Tools
+django-model-utils
+django_unique_upload
+
+# Rest apis
+djangorestframework
+Markdown
+django-filter
+
+
+# Static and Media Storage
+django-storages==1.14.2
+boto3
+
+# CORS
+django-cors-headers
+
+# Envrionment parsing
+environs
+
+# Authenticaton
+djoser
+
+#Database baked background tasks
+huey
+
+#JsonLD
+pyld
+
+django-richtextfield
+
+minio

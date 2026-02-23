@@ -1,0 +1,11 @@
+<!-- Loader Overlay -->
+<div x-show="isLoading" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <!-- Animated Loader -->
+    <div class="flex items-center">
+        <svg class="animate-spin h-12 w-12 text-blue-500 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014.024 15H1.002a10 10 0 009.65 8.042l-1.802-5.407zM20 12a8 8 0 01-8 8V24c6.627 0 12-5.373 12-12h-4zm-2-7.291A7.962 7.962 0 0119.024 9h2.978a10 10 0 00-9.65-8.042l1.802 5.407z"></path>
+        </svg>
+        <span class="text-xl text-white" x-text="loadingStories"></span>
+    </div>
+</div>

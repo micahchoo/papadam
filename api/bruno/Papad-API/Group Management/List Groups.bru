@@ -1,0 +1,21 @@
+meta {
+  name: List Groups
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{base_url}}/group/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  ~Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  ~name: group 1
+  ~description: something to be described about the group
+}

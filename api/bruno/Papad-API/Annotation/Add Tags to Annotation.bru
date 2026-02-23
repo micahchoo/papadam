@@ -1,0 +1,23 @@
+meta {
+  name: Add Tags to Annotation
+  type: http
+  seq: 12
+}
+
+put {
+  url: {{ base_url }}/annotate/add_tag/d2d75b65-09b8-4491-b64f-03e31beeb763/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Token {{auth_token}}
+}
+
+body:json {
+  {
+  
+  "tags": ["rights"]
+  }
+}

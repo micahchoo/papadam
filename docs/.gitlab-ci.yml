@@ -1,0 +1,31 @@
+variables:
+  VERSION: "2.5"
+  # Tell 'docker:dind' to enable TLS (recommended)
+  # and generate certificates in the specified directory.
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCS_DOCKER_IMAGE: "janastu/papad-docs"
+docker-build:
+  # Use the official docker image.
+  image: docker:latest
+  stage: build
+  only:
+    - draft 
+    - prod
+  services:
+    - docker:dind
+  before_script:
+    - echo -n "$DOCKERHUB_RW_Token" | docker login -u "$DOCKERHUB_RW_Username"  --password-stdin 
+  # Default branch leaves tag empty (= latest tag)
+  # All other branches are tagged with the escaped branch name (commit ref slug)
+  script:
+    - |
+      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+        tag="$VERSION"
+        echo "Running on default branch '$CI_DEFAULT_BRANCH': tag = $VERSION"
+      else
+        tag="$VERSION-$CI_COMMIT_BRANCH"
+        echo "Running on branch '$CI_COMMIT_BRANCH': tag = $tag"
+      fi
+    - docker build  -t "${DOCS_DOCKER_IMAGE}:${tag}" .
+    - docker push "${DOCS_DOCKER_IMAGE}:${tag}"
+

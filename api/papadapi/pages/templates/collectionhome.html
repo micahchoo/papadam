@@ -1,0 +1,159 @@
+{% extends '_base.html' %}
+{% load static %}
+
+{% block static %}
+<script src="{% static 'js/collection_details.js' %}"></script>
+{% endblock static %}
+
+{% block content %}
+
+<div class="gap-4 p-4 pt-10" x-data="getCollectionDetails()" x-init="init">
+  {%include 'partials/common/loader.html'%}
+
+  <div class="container">
+    <div class="flex items-center gap-1 text-blue-500">
+      <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="20" height="20" viewBox="0,0,256,256"
+        style="fill:#228BE6;">
+        <g fill="#228be6" fill-rule="nonzero" stroke="none" stroke-width="1" stroke-linecap="butt"
+          stroke-linejoin="miter" stroke-miterlimit="10" stroke-dasharray="" stroke-dashoffset="0" font-family="none"
+          font-weight="none" font-size="none" text-anchor="none" style="mix-blend-mode: normal">
+          <g transform="scale(10.66667,10.66667)">
+            <path
+              d="M12,2c-0.26712,0.00003 -0.52312,0.10694 -0.71094,0.29688l-10.08594,8.80078c-0.12774,0.09426 -0.20313,0.24359 -0.20312,0.40234c0,0.27614 0.22386,0.5 0.5,0.5h2.5v8c0,0.552 0.448,1 1,1h4c0.552,0 1,-0.448 1,-1v-6h4v6c0,0.552 0.448,1 1,1h4c0.552,0 1,-0.448 1,-1v-8h2.5c0.27614,0 0.5,-0.22386 0.5,-0.5c0.00001,-0.15876 -0.07538,-0.30808 -0.20312,-0.40234l-10.08008,-8.79492c-0.00194,-0.00196 -0.0039,-0.00391 -0.00586,-0.00586c-0.18782,-0.18994 -0.44382,-0.29684 -0.71094,-0.29687z">
+            </path>
+          </g>
+        </g>
+      </svg>
+      <a href="/ui/" class="hover:text-gray-700 transition">Home</a>
+      <span class="mx-2">/</span> <!-- Separator -->
+      <span x-text="collectionDetails.name" class="text-gray-700"></span>
+    </div>
+  </div>
+  <div class="grid min-h-screen grid-cols-1 md:grid-cols-3 md:gap-4 gap-4 mb-4 md:mb-0 bg-gray-100 p-4">
+
+
+    <div class="col-span-1 md:col-span-1 flex flex-col items-center rounded-lg bg-white p-4 shadow">
+      <div class="h-[680px] bg-white rounded-[15px] px-3 overflow-auto">
+        <div class="w-[66px] h-5 pl-[17px] pr-[16.11px] py-[3px] bg-lime-600 shadow justify-center items-center inline-flex">
+          <div class="w-[32.89px] h-3.5 text-center text-white text-xs font-normal font-['Roboto'] leading-tight" x-text="collectionDetails.is_public ? 'Public' : 'Private'">
+          </div>
+        </div>
+        <div class="card-header flex justify-between p-3">
+          <h1 class="font-extrabold text-2xl capitalize" x-text="collectionDetails.name"></h1>
+          
+          <!-- Settings Button with Dropdown Menu -->
+          <div x-show="inCollection" class="relative" x-data="{ showSettings: false }">
+            <button @click="showSettings = !showSettings" class="text-gray-500 hover:text-gray-700 p-2 focus:outline-none">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
+            
+            <!-- Dropdown Menu for Settings -->
+            <div x-show="showSettings" @click.away="showSettings = false" class="absolute right-0 mt-2 py-2 w-48 bg-white rounded-md shadow-xl z-10">
+              <!-- Edit Collection Option -->
+              <a href="#" @click="editCollection" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"></path><polygon points="18 2 22 6 12 16 8 16 8 12 18 2"></polygon></svg>
+                <span class="ml-2">Edit Collection</span>
+              </a>
+        
+              <!-- Add user Option -->
+              <a href="#" @click="editUser" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>
+                <span class="ml-2">Add/Remove User</span>
+              </a>
+              <a href="#" @click="editQuestion" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"></path><polygon points="18 2 22 6 12 16 8 16 8 12 18 2"></polygon></svg>
+                <span class="ml-2">Add/Remove Custom Question</span>
+              </a>
+              
+            </div>
+          </div>
+        </div>
+        <img src={% static "images/Creative-Commons.ico" %}
+          alt="Collection Image" class="w-[100%] h-[332px] object-cover rounded-lg my-4"
+          onerror="this.src='http://www.iconarchive.com/download/i82888/limav/flat-gradient-social/Creative-Commons.ico'" />
+        <p class="py-4 px-3" x-html="collectionDetails.description"></p>
+        <template x-for="user in collectionDetails.users" :key="user.id" id="content" class="p-2 h-[100px]">
+
+          <div
+            class=" h-8 px-4 pt-1.5 pb-1 rounded-3xl border-2 border-green-500 justify-center items-center inline-flex mx-1 my-1">
+            <div class=" h-5 text-center text-black text-opacity-90 text-sm font-semibold font-['Roboto'] leading-snug"
+              x-text="user.username"></div>
+          </div>
+        </template>
+      </br>
+        <template x-for="tag in collectionDetails.tags" :key="tag.id" id="content" class="p-2 h-[120px]">
+          <div
+            class=" h-[22px] pl-[13px] pr-[12.80px] py-[3px] bg-blue-400 rounded-2xl justify-center items-center inline-flex mx-1 my-1">
+            <div class=" h-4 text-white text-sm font-semibold font-['Roboto'] leading-tight" x-text="tag.name"></div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="col-span-1 md:col-span-2 overflow-auto rounded-lg bg-white p-2 shadow w-full" style="max-height: calc(100vh);">
+      <div x-data="{ activeTab: 'tab1'}" class="flex flex-col items-center my-4">
+          <!-- Tab buttons -->
+          <div class="flex border rounded-2xl border-blue-300 p-1">
+            <button @click="activeTab = 'tab1'"
+              :class="{ 'bg-blue-500': activeTab === 'tab1', 'text-white': activeTab === 'tab1', 'text-blue-500': activeTab !== 'tab1' }"
+              class="px-4 py-2 mx-1 rounded-2xl">Media</button>
+            <button @click="activeTab = 'tab2'"
+              :class="{ 'bg-blue-500': activeTab === 'tab2', 'text-white': activeTab === 'tab2', 'text-blue-500': activeTab !== 'tab2' }"
+              class="px-4 py-2 mx-1 rounded-2xl">Relations</button>
+
+          </div>
+
+          <!-- Tab content -->
+          <div x-show="activeTab === 'tab1' && !isLoading" class="mt-4 p-4  bg-white ">
+            <!-- Content for Tab 1 -->
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 p-3">
+              <div x-show="inCollection" class="w-full h-[356px] rounded-2xl flex flex-col items-center justify-center">
+                <button x-on:click="window.location.href='/ui/collection/'+groupId+'/media/create'"
+                  class="p-4 border-2 border-dotted border-black rounded-2xl">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="46" height="46" fill="currentColor" class="bi bi-upload"
+                    viewBox="0 0 16 16">
+                    <path
+                      d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                    <path
+                      d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
+                  </svg>
+                </button>
+                <p class="mt-2 text-center">Upload media</p>
+              </div>
+              <template x-for="media in mediaDetails" :key="media.id">
+                <div class="w-full p-5 bg-white rounded-2xl border border-blue-500 flex flex-col justify-start items-start gap-4">
+                  <!-- Media name -->
+                  <div class="text-black text-opacity-90 text-2xl font-semibold font-['Roboto'] leading-snug overflow-hidden whitespace-wrap break-words" x-text="media.name"></div>
+                  
+                  <!-- Media description -->
+                  <div class="text-black text-opacity-90 text-sm font-normal font-['Roboto'] leading-snug overflow-hidden whitespace-wrap break-words" x-html="media.description"></div>
+                  
+                  <!-- Media tags -->
+                  <div class="flex flex-wrap gap-1">
+                    <template x-for="tag in media.tags" :key="tag.id">
+                      <div class="px-3 py-1 bg-blue-400 rounded-2xl text-white text-sm font-semibold leading-tight" x-text="tag.name"></div>
+                    </template>
+                  </div>
+                  
+                  <!-- Contributors -->
+                  <div class="text-neutral-500 text-opacity-90 text-sm font-normal font-['Roboto'] leading-snug">
+                    1 contributors working on this story
+                  </div>
+                  
+                  <!-- View Button -->
+                  <button @click="viewMedia(media.uuid)" class="w-full bg-blue-500 text-white py-2 my-5 rounded-3xl text-center">View</button>                </div>
+              </template>
+              
+              
+            </div>
+          </div>
+
+          <div x-show="activeTab === 'tab2'" class="mt-4 p-4 border bg-white rounded">
+            <!-- Content for Tab 2 -->
+            <p>Work in progress</p>
+          </div>
+        </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

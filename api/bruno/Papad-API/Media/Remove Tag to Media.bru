@@ -1,0 +1,23 @@
+meta {
+  name: Remove Tag to Media
+  type: http
+  seq: 15
+}
+
+put {
+  url: {{ base_url }}/archive/remove_tag/49144ba5-925a-4d51-b5b8-065bb53a0632/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Token {{auth_token}}
+}
+
+body:json {
+  {
+  
+  "tags": ["2"]
+  }
+}

@@ -1,0 +1,40 @@
+{% extends '_base.html' %}
+{% load static %}
+
+{% block static %}
+  <script src="{% static 'js/login.js' %}"></script>
+{% endblock static %}
+
+
+
+{% block content %}
+
+<div x-data="postLogin()" class="min-h-screen flex items-center justify-center">
+    <!-- Centering Container -->
+    <div class="flex flex-col items-center justify-center w-full">
+   
+        <!-- Login Box Container -->
+        <div class="w-full max-w-md bg-white p-8 rounded shadow-md">
+            <h1 class="text-2xl font-semibold mb-4">Login</h1>
+            <p class="text-red-500 mb-4" x-text="loginDetails.error_message"></p>
+            <div class="mb-4">
+                <label for="username" class="block text-sm font-medium text-gray-600">Username</label>
+                <input type="text" id="username" x-model="loginDetails.username" name="username" class="mt-1 p-2 w-full border rounded">
+            </div>
+            <div x-text="usernameError" class="text-red-500 text-sm italic mb-2"> {{ usernameError }}</div>
+            <div class="mb-4">
+                <label for="password" class="block text-sm font-medium text-gray-600">Password</label>
+                <input type="password" id="password" x-model="loginDetails.password" name="password" class="mt-1 p-2 w-full border rounded">
+            </div>
+            <div x-text="passwordError" class="text-red-500 text-sm italic mb-2"> {{ passwordError }}</div>
+             <!-- Forgot Password Link -->
+             <div class="mt-4">
+                <a href="/ui/reset_password/" class="text-sm text-blue-600 hover:underline">Forgot Password?</a>
+            </div></br>
+            <button class="bg-blue-500 text-white px-4 py-2 rounded" @click="doLogin()">Login</button>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}

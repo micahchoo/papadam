@@ -1,0 +1,24 @@
+meta {
+  name: Copy Media
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{base_url}}/archive/copy/7be02f9d-1d94-4569-9246-e1b8ed4344ed/ng.nnana
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  from_group: 1
+  to_group: 2
+  copy_tags: True
+  copy_annotations: True
+  ~extra_group_response: {"answers":[{"question_id":1,"response":"Hello"}]}
+}

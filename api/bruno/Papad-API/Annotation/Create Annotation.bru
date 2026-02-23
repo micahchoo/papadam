@@ -1,0 +1,24 @@
+meta {
+  name: Create Annotation
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{base_url}}/annotate/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  media_reference_id: cb95607d-4748-49ae-8d69-bf4dd4868421
+  annotation_text: Yet another annotation
+  media_target: t=338,345
+  tags: idea,effort,aspiration,inspiration,movement
+  ~created_by: 
+}

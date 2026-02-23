@@ -1,0 +1,23 @@
+meta {
+  name: Update Group
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{base_url}}/group/13/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Content-Type: multipart/form-data
+  Authorization: Token {{auth_token}}
+}
+
+body:multipart-form {
+  name: Casteless Collective-Backup
+  delete_wait_for: 0
+  ~description: A collection of videos on Gender interspections from Communities
+  ~users: b7e43ae4-08d5-4ed4-a6f3-24463498a5ae
+}

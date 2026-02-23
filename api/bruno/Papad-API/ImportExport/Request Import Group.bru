@@ -1,0 +1,22 @@
+meta {
+  name: Request Import Group
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{base_url}}/import/
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+  Content-Type: multipart/form-data
+}
+
+body:multipart-form {
+  upload: 
+  ie_metadata: {"type":"group","name":"Some name I am giving","description":"Imported group 2"}
+  : 
+}

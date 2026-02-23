@@ -1,0 +1,28 @@
+<div x-data="getCollectionMediaList()" x-init="init">
+  <div class="rounded p-4">
+    <div class="relative flex w-80 flex-col rounded-xl bg-blue-100 bg-clip-border text-gray-700 shadow-md">
+      <div class="p-6">
+        <h5 class="text-blue-gray-900 mb-2 block font-sans text-xl font-semibold leading-snug tracking-normal antialiased">
+          Create Media
+        </h5>
+      </div>
+    </div>
+  </div>
+
+  <template x-for="media in collectionMediaList">
+  
+    <div class="rounded p-4">
+      <div class="relative flex w-80 flex-col rounded-xl bg-white bg-clip-border text-gray-700 shadow-md">
+        <div class="p-6">
+          <h5 class="text-blue-gray-900 mb-2 block font-sans text-xl font-semibold leading-snug tracking-normal antialiased" x-text="media.name"></h5>
+          <span x-text="media.uuid"></span>
+          <p class="block font-sans text-base font-light leading-relaxed text-inherit antialiased" x-text="media.description"></p>
+        </div>
+        <div class="p-6 pt-0">
+          <a :href="'/ui/collection/'+ collectionDetails.id +'/media/'+ media.uuid +'/'" data-ripple-light="true" type="button" class="select-none rounded-lg bg-blue-500 px-6 py-3 text-center align-middle font-sans text-xs font-bold uppercase text-white shadow-md shadow-blue-500/20 transition-all hover:shadow-lg hover:shadow-blue-500/40 focus:opacity-[0.85] focus:shadow-none active:opacity-[0.85] active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"></a>
+        </div>
+      </div>
+    </div>
+
+  </template>
+</div>

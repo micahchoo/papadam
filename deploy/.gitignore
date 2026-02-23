@@ -1,0 +1,8 @@
+minio/
+db/
+docs/
+ui/
+service_config.env
+build/
+tasks/
+papad-assets/

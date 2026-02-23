@@ -1,0 +1,23 @@
+meta {
+  name: Request Export Group
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{base_url}}/export/
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+  	"type":"group",
+  	"id": "6"
+  }
+}

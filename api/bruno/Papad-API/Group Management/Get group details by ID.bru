@@ -1,0 +1,16 @@
+meta {
+  name: Get group details by ID
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{base_url}}/group/9/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Token {{auth_token}}
+}

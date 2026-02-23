@@ -1,0 +1,19 @@
+meta {
+  name: Get my user details
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{login_url}}/users/me/
+  body: none
+  auth: bearer
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+}
+
+auth:bearer {
+  token: Token {{auth_token}}
+}

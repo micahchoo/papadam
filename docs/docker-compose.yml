@@ -1,0 +1,16 @@
+version: '3.3'
+services:
+  documentation:
+    restart: always
+    build:
+      context: .
+      dockerfile: ./Dockerfile.distribute
+    image: janastu/papad-docs:latest
+    command: >
+        bash -c " pip install -r /docs/requirements.txt &&
+              cd /docs/ &&
+              mkdocs serve"
+    volumes:
+      - ./:/docs/
+    ports:
+      - "8001:8001"

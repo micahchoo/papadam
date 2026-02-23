@@ -1,0 +1,59 @@
+<!-- Scrollable card container -->
+<div class="space-y-4">
+    <select x-model="selectedOption" @change="sort()" class="border rounded-md p-2">
+        <option value="">Sort By</option>
+        <option value="oldestCreated">Oldest Created</option>
+        <option value="latestCreated">Latest Created</option>
+        <option value="oldestUpdated">Oldest Updated</option>
+        <option value="latestUpdated">Latest Updated</option>
+    </select>
+
+    <template x-for="cma in collectionMediaAnnotations" :key="cma.uuid">
+        <!-- Annotation card -->
+        <div class="relative rounded-lg border p-3 bg-white shadow-md">
+            <!-- Scrollable text -->
+            <div class="absolute top-0 right-0 bg-blue-500 text-white px-2 py-1 text-sm font-bold" x-text="cma.media_target"></div>
+            <div class="mb-2 mt-4 h-24 overflow-auto">
+                <p x-html="convertUrlsToLinks(cma.annotation_text)"></p>            </div>
+            <!-- Tags/Hashtags -->
+            <div class="flex flex-wrap gap-2 mb-2">
+                <template x-for="tag in cma.tags">
+                    <span class="rounded-full bg-blue-400 p-1 text-sm text-white py-1.5 px-3" x-text="tag.name"></span>
+                </template>
+            </div>
+
+            <!-- Name and Actions -->
+            <div x-show="!isLoading" class="flex justify-between items-center">
+                <p class="text-black-700 text-center bg-[#91caff] rounded-md flex items-center justify-center font-medium leading-snug py-0.5 px-1" x-text="cma.created_by.username"></p>
+                <!-- Icons to the right of the additional text -->
+                <div x-show="isAuthAnnotation(cma.created_by.id)" class="flex space-x-1">
+                    <!-- Share icon -->
+                    <button class="p-1 text-gray-600 hover:text-gray-800">
+                        <!-- Share -->
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="stroke-cyan-500 w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+                        </svg>
+                    </button>
+                    <!-- Edit icon -->
+                    <button class="p-1 text-gray-600 hover:text-gray-800" @click="loadAnnotationEdit(cma.uuid)">
+                        <!-- Replace with actual icon code -->
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                        </svg>
+                    </button>
+                    <!-- Delete icon -->
+                    <button class="p-1 text-gray-600 hover:text-gray-800" @click="deleteAnnotation(cma.uuid)">
+                        <!-- Replace with actual icon code -->
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- End of Annotation Card-->
+    </template>
+    <template x-if="collectionMediaAnnotations.length === 0">
+        <p class="text-gray-600 mt-4 text-center">No annotations available</p>
+    </template>
+</div>

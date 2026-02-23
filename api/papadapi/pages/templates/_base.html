@@ -1,0 +1,57 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %} PLASMA {% endblock title %} </title>
+    <script src="{% static 'js/common/axios.min.js' %}"></script>
+    <script defer src="{% static 'js/common/alpine.min.js' %}"></script>
+
+    <script src="{% static 'js/common/utilities.js' %}"></script>
+    <script src="{% static 'js/common/commonapicall.js' %}"></script>
+    <script src="{% static 'js/common/myprofile.js' %}"></script>
+    <script src="{% static 'js/common/ckeditor/ckeditor.js' %}"></script>
+    <script src="{% static 'js/common/tailwind-3.4.0.js' %}"></script>
+    <style>
+        [x-cloak] {
+            display:none;
+        }
+        @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
+            to {
+              transform: rotate(360deg);
+            }
+          }
+          .animate-spin {
+            animation: spin 1s linear infinite;
+          }
+          /* New color theme styles */
+            .primary-color { background-color: #a8d5ba; }
+            .secondary-text { color: #4a4a4a; }
+            .interactive-element, .interactive-element:hover { background-color: #91c2d3; color: #ffffff; }
+            .interactive-element:hover { background-color: #749aad; }
+            .accent-color { color: #f4a261; }
+            .background-color { background-color: #fdfbfa; }
+          
+            </style>
+    {% block static %}
+
+    {% endblock static %}
+</head>
+  <body class="min-h-screen bg-gray-100" x-data="getMyProfile()" x-init="init">
+
+    {% include 'partials/common/navbar.html' %}
+    
+    {% block content %}
+
+    {% endblock content %}
+
+    
+    {% include 'partials/common/footer.html' %}
+
+</body>
+</html>

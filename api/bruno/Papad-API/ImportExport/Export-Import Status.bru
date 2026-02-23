@@ -1,0 +1,15 @@
+meta {
+  name: Export-Import Status
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{base_url}}/export/fd25acd9-f90c-4e08-898f-b66ffa381e6d/
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+}

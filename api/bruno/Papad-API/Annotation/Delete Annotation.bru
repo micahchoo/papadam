@@ -1,0 +1,15 @@
+meta {
+  name: Delete Annotation
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{base_url}}/annotate/id/c4ad1f24-5407-47ef-b626-6972abd1ae96/
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Token {{auth_token}}
+}
