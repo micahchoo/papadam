@@ -4,39 +4,46 @@ Django==4.2
 gunicorn
 Pillow
 
-# For the persistence stores
+# Database
 psycopg2-binary==2.9.9
 dj-database-url
 
-# Model Tools
+# Model tools
 django-model-utils
 django_unique_upload
 
-# Rest apis
+# REST API
 djangorestframework
 Markdown
 django-filter
 
+# Auth — JWT (djoser for user management, simplejwt for tokens)
+djoser
+djangorestframework-simplejwt
 
-# Static and Media Storage
+# OpenAPI schema
+drf-spectacular
+
+# Storage
 django-storages==1.14.2
 boto3
+minio
 
 # CORS
 django-cors-headers
 
-# Envrionment parsing
+# Environment
 environs
 
-# Authenticaton
-djoser
+# Task queue (Redis-backed)
+arq
+redis
 
-#Database baked background tasks
-huey
+# Logging
+structlog
 
-#JsonLD
-pyld
-
+# Rich text
 django-richtextfield
 
-minio
+# JSON-LD
+pyld

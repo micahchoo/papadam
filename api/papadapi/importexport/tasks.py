@@ -7,7 +7,11 @@ import requests
 from django.core.files import File
 from django.core.files.storage import default_storage
 from django.shortcuts import get_object_or_404
-from huey.contrib.djhuey import db_task
+import structlog
+
+from papadapi.tasks_compat import db_task
+
+log = structlog.get_logger(__name__)
 
 from papadapi.annotate.models import Annotation
 from papadapi.archive.models import MediaStore

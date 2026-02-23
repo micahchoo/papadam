@@ -5,9 +5,12 @@ import os
 from minio import Minio
 from minio.error import S3Error
 
-from huey.contrib.djhuey import db_task
-from huey.contrib.djhuey import task
+import structlog
+
+from papadapi.tasks_compat import db_task, task
 from django.conf import settings
+
+log = structlog.get_logger(__name__)
 
 from papadapi.archive.models import MediaStore
 
@@ -58,8 +61,8 @@ def convert_to_hls(media_id, output_folder):
         
         upload_to_storage.schedule((media_id,output_folder),delay=10)
     except Exception as e:
-        print(f"Error occurred: {e}")
-        update_media_processing_status(m,"Processing error")
+        log.error("hls_video_conversion_failed", media_id=media_id, error=str(e))
+        update_media_processing_status(m, "Processing error")
         raise
 
 @task(retries=3, retry_delay=60)
@@ -98,8 +101,8 @@ def convert_to_hls_audio(media_id, output_folder):
         update_media_processing_status(m,"Processing started")
         upload_to_storage.schedule((media_id,output_folder),delay=10)
     except Exception as e:
-        print(f"Error occurred: {e}")
-        update_media_processing_status(m,"Processing error")
+        log.error("hls_audio_conversion_failed", media_id=media_id, error=str(e))
+        update_media_processing_status(m, "Processing error")
         raise
 
 def create_minio_client(endpoint, access_key, secret_key, secure=True):
@@ -159,20 +162,19 @@ def upload_to_storage(media_id,folder_path):
                 # Check if file already exists in MinIO
                 try:
                     minio_client.stat_object(bucket_name, minio_file_path)
-                    print(f"File {minio_file_path} already exists, skipping...")
+                    log.info("storage_upload_skipped", path=minio_file_path, reason="already_exists")
                     continue
                 except S3Error:
                     # File does not exist, proceed with upload
                     pass
 
                 minio_client.fput_object(bucket_name, minio_file_path, local_file_path)
-                # TODO: Should effectively go to a log file instead of a print
-                print(f"Uploaded {local_file_path} to {minio_file_path}")
+                log.info("storage_upload_complete", local=local_file_path, remote=minio_file_path)
                 # This file is now successfully upload. Remove this to save space and reduce duplicate push compute
                 os.remove(local_file_path)
             except S3Error as e:
                 is_error = True
-                print(f"Failed to upload {local_file_path}: {e}")
+                log.error("storage_upload_failed", local=local_file_path, error=str(e))
     if not is_error:
         update_media_processing_status(m,"Stream completed")
     else:
