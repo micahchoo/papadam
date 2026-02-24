@@ -626,7 +626,6 @@ Deferred from Phase 4:
 - [ ] Exhibit block drag reorder (▲/▼ buttons are live)
 - [ ] `icon` and `voice` interaction profiles — full rendering (CSS vars + UIConfig wired; profile-specific UIs pending)
 - [ ] `player_controls.show_waveform` — audio waveform display
-- [ ] `player_controls.show_transcript` — Whisper captions below player
 - [ ] Exhibit publish endpoint (`GET /api/v1/exhibit/{uuid}/publish/`)
 
 New:

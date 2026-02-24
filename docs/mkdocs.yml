@@ -8,11 +8,11 @@ nav:
   - Home: 'index.md'
   - How to Use:
     - Authentication: 'howtouse/authentication'
-    - Dashboard: 'howtouse/dashboard'
+    - Collections: 'howtouse/dashboard'
     - Groups: 'howtouse/groups'
-    - Upload Audio/Video: 'howtouse/uploadmedia'
+    - Upload Media: 'howtouse/uploadmedia'
     - Annotation: 'howtouse/annotate'
-    - Search: 'howtouse/search'
+    - Search and Sort: 'howtouse/search'
     - Exhibits: 'howtouse/exhibits'
   - Instance Admin:
     - Creating superuser: admin/create_admin_user.md
