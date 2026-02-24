@@ -15,6 +15,10 @@
     # Docs (if docs profile active)
     reverse_proxy /docs/*   docs:8001
 
+    # Runtime config — fetched by SvelteKit SPA on startup
+    reverse_proxy /config.json  api:8000
+    reverse_proxy /healthcheck/ api:8000
+
     # SvelteKit SPA — serve static build, fall back to index.html
     root * /srv/ui
     file_server

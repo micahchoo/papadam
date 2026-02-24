@@ -1,72 +1,47 @@
-# Search
-Search is the second best feature we looking at the moment as what you search and get as results fetches the story board inputs so the better the search we provide the better the product will be.
+# Searching
 
-Here we have several options to search,
-     
-    - Super Search - Directly start searching for 
-        - Name
-        - Description
-        - Location or
-        - Author 
+You can search the archive by name, description, tags, and other fields.
 
-    - Search by Name - Click on Name button and start typing the name of the media you looking for and get the result poured down.
+## Searching within a group
 
-    - Search by Description - Click on Description button and start typing the Description of the media you looking for and get the result poured down.
+Open a group's archive page. Use the search and filter controls at the top of the media list.
 
-    - Search by Tags - Click on Tags that are on the right side of the screen, on click of the specific tag, renders that tag based media. And to search multi tag just click on the other tags that you looking to search.
+![Search dashboard](/static/search/searchDashboard.png)
 
-![search](/static/search/searchDashboard.png)
+## Search by name
 
-## Super Search
-Super Search fetches you search from name and description for now. Can search based on name and search based on description. Soon we developing to get you search based on author, location and other fields to give a advance search experience. Search is the second best feature we looking at the moment as what you search and get as results fetches the story board inputs so the better the search we provide the better the product will be.
+Type in the name field to filter media by title.
 
-**Super search based on name**
+![Search by name](/static/search/name.png)
+![Search results by name](/static/search/nameRes.png)
 
-Search by name
-![search](/static/search/superSearchName.png)
+## Search by description
 
-**Super search based on name**
+Filter media by description text.
 
-Search by description
-![search](/static/search/superSearchDesc.png)
+![Search by description](/static/search/desc.png)
+![Search results by description](/static/search/descRes.png)
 
-## Search by Tags
+## Search by tags
 
-Search based on tags by on click feature
+Click a tag in the sidebar to filter media that has that tag.
+Click multiple tags to narrow results further.
 
-**Tags search single**
+**Single tag:**
+![Tag search](/static/search/searchTags.png)
 
-![search](/static/search/searchTags.png)
+**Multiple tags:**
+![Multi-tag search](/static/search/searchTagsMulti.png)
 
-**Tags search multi**
+## Search by group
 
-![search](/static/search/searchTagsMulti.png)
+Filter results to a specific group.
 
-## Search by Name
+![Group search](/static/search/group_search.png)
 
-Search audio by name
-![search](/static/search/name.png)
-![search](/static/search/nameRes.png)
+## Search by annotation content
 
+Find media that has annotations matching your search text.
 
-## Search by Description
-
-Search media by Description
-![search](/static/search/desc.png)
-![search](/static/search/descRes.png)
-
-## Search by groups
-![group search](/static/search/group_search.png)
-
-## Search by Annotations
-
-Search media by Annotations, and allow annotations to be part of story board soon.
-![search](/static/search/annotations.png)
-![search](/static/search/anno.png)
-
-## Advance Search
-
-It is in processs and yes we are thinking and brain storming and developing one by one on a faster pace to deliver to you folks !!
-![search](/static/search/advSearch.png)
-
-
+![Annotation search](/static/search/annotations.png)
+![Annotation search results](/static/search/anno.png)

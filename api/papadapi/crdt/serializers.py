@@ -5,7 +5,7 @@ from rest_framework import serializers
 from papadapi.crdt.models import YDocState
 
 
-class Base64BinaryField(serializers.Field):
+class Base64BinaryField(serializers.Field[str, bytes]):
     """Encode BinaryField bytes as base64 for JSON transport."""
 
     def to_representation(self, value: bytes | memoryview) -> str:
@@ -22,7 +22,7 @@ class Base64BinaryField(serializers.Field):
             raise serializers.ValidationError("Invalid base64 encoding.") from exc
 
 
-class YDocStateSerializer(serializers.ModelSerializer):
+class YDocStateSerializer(serializers.ModelSerializer[YDocState]):
     state_vector = Base64BinaryField()
 
     class Meta:

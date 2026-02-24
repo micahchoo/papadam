@@ -8,6 +8,9 @@
  * Architecture boundary: may only import from $lib/api.
  */
 
+import { uiconfig } from '$lib/api';
+import type { UIConfig } from '$lib/api';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface RuntimeConfig {
@@ -17,27 +20,11 @@ export interface RuntimeConfig {
 	crdtUrl: string;
 }
 
-export type UIProfile = 'standard' | 'icon' | 'voice' | 'high-contrast';
-
-export interface UIConfig {
-	profile: UIProfile;
-	logoUrl: string | null;
-	primaryColor: string;
-	welcomeText: string;
-}
-
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_RUNTIME: RuntimeConfig = {
-	apiUrl: (import.meta.env['VITE_API_URL'] as string | undefined) ?? '',
-	crdtUrl: (import.meta.env['VITE_CRDT_URL'] as string | undefined) ?? ''
-};
-
-export const DEFAULT_UICONFIG: UIConfig = {
-	profile: 'standard',
-	logoUrl: null,
-	primaryColor: '#1e3a5f',
-	welcomeText: 'Welcome'
+	apiUrl: import.meta.env['VITE_API_URL'] ?? '',
+	crdtUrl: import.meta.env['VITE_CRDT_URL'] ?? ''
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -80,3 +67,28 @@ export async function loadConfig(): Promise<RuntimeConfig> {
 export function getConfig(): RuntimeConfig {
 	return _runtime;
 }
+
+// ── UIConfig loading ──────────────────────────────────────────────────────────
+
+let _uiConfig: UIConfig | null = null;
+
+/**
+ * Fetch UIConfig from the API and cache it in module state.
+ * Called from +layout.svelte on mount; subsequent callers get the cached value.
+ */
+export async function loadUIConfig(): Promise<UIConfig | null> {
+	try {
+		const { data } = await uiconfig.get();
+		_uiConfig = data;
+		return data;
+	} catch {
+		return null;
+	}
+}
+
+/** Synchronous getter — valid after loadUIConfig() resolves. */
+export function getUIConfig(): UIConfig | null {
+	return _uiConfig;
+}
+
+export type { UIConfig };

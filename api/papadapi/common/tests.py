@@ -10,7 +10,6 @@ import pytest
 from papadapi.common.functions import create_or_update_tag, get_final_tags_count
 from papadapi.common.models import Tags
 
-
 # ── create_or_update_tag ──────────────────────────────────────────────────────
 
 
@@ -85,3 +84,78 @@ class TestGetFinalTagsCount:
         anno = [{"id": 2, "symbolSize": 3, "tag_in": False, "category": 1}]
         result = get_final_tags_count(media, anno, count=False)
         assert len(result) == 2
+
+
+# ── UIConfig signal ────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestUIConfigSignal:
+    def test_creating_group_auto_creates_uiconfig(self) -> None:
+        from papadapi.common.models import Group, UIConfig
+
+        group = Group.objects.create(name="Signal Test Group")
+        assert UIConfig.objects.filter(group=group).exists()
+
+    def test_uiconfig_has_correct_defaults(self) -> None:
+        from papadapi.common.models import Group, UIConfig
+
+        group = Group.objects.create(name="Defaults Group")
+        cfg = UIConfig.objects.get(group=group)
+        assert cfg.brand_name == "Papad.alt"
+        assert cfg.primary_color == "#1e3a5f"
+        assert cfg.accent_color == "#3b82f6"
+        assert cfg.profile == "standard"
+        assert cfg.color_scheme == "default"
+
+    def test_uiconfig_not_duplicated_on_second_save(self) -> None:
+        from papadapi.common.models import Group, UIConfig
+
+        group = Group.objects.create(name="No Dup Group")
+        group.name = "Updated"
+        group.save()
+        assert UIConfig.objects.filter(group=group).count() == 1
+
+
+# ── UIConfig view ──────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestUIConfigView:
+    def test_get_anon_returns_200(self, api_client) -> None:
+        resp = api_client.get("/api/v1/uiconfig/")
+        assert resp.status_code == 200
+        assert resp.data["brand_name"] == "Papad.alt"
+
+    def test_get_anon_has_required_fields(self, api_client) -> None:
+        resp = api_client.get("/api/v1/uiconfig/")
+        assert resp.status_code == 200
+        for field in ("profile", "primary_color", "accent_color", "color_scheme"):
+            assert field in resp.data
+
+    def test_get_auth_with_group_returns_config(self, member_client) -> None:
+        resp = member_client.get("/api/v1/uiconfig/")
+        assert resp.status_code == 200
+        assert "profile" in resp.data
+        assert "brand_name" in resp.data
+
+    def test_patch_updates_brand_name(self, member_client) -> None:
+        from papadapi.common.models import UIConfig
+
+        resp = member_client.patch(
+            "/api/v1/uiconfig/",
+            data={"brand_name": "My Community"},
+            format="json",
+        )
+        assert resp.status_code == 200
+        assert resp.data["brand_name"] == "My Community"
+        cfg = UIConfig.objects.get(group=member_client.group)
+        assert cfg.brand_name == "My Community"
+
+    def test_patch_requires_auth(self, api_client) -> None:
+        resp = api_client.patch(
+            "/api/v1/uiconfig/",
+            data={"brand_name": "Anon"},
+            format="json",
+        )
+        assert resp.status_code == 401

@@ -22,6 +22,8 @@ class AnnotationSerializer(serializers.ModelSerializer):
             "media_reference_id",
             "media_target",
             "annotation_image",
+            "annotation_audio",
+            "annotation_video",
             "reply_to",
             "media_ref_uuid",
             "uuid",

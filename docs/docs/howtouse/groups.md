@@ -1,23 +1,30 @@
 # Groups
 
-Groups are a logical seperation of media that we upload to be made available to different users. Groups ensure that only a group of users have the rights to upload and annotate. Groups also have the following configurations 
+Groups are the primary organisational unit. Each group has its own archive of media,
+its own members, and its own settings.
 
-1. **Public / Private** : This setting ensures if non-member can see the group and access the media listed in the group. If public, everyone can see the media and annotation, but only members can annotate and upload media. 
-2. **Keep deleted data**: This setting describes, how the delete action is to be take care. If this value is set of 0, then all delete actions (both media and annotation) are deleted immediatly. If this value is set to 1, then the actual permanent deletion happens after 1 day. If the value is set to 2, then 2 days and so on. 
-3. **Extra Fields** : Papad by default only requires a Name, Media and tags for annotation. The description is an optional field. In an everyday deployment, communities find this extremenly limiting. This option allows every group to have a custom set of questions. As of now, this is only elementary support allowing fields to be named and marked as mandatory. In the upcoming releases, this should have a more stable version. 
+## Creating a group
 
+Click **Create group** in the navigation bar and fill in the group name and settings.
 
-You can create the group using the Create group button in the navigation bar. 
+![Group creation form](/static/groups/group_create.png)
 
-![Group Creation](/static/groups/group_create.png)
+## Group settings
 
+| Setting | Description |
+|---|---|
+| **Public / Private** | Public: anyone can see the group and browse its media. Members-only: only group members can see it. In both cases, only members can upload and annotate. |
+| **Keep deleted data** | How long before deleted media and annotations are permanently removed. 0 = immediately. 1 = after 1 day. 2 = after 2 days. Etc. |
+| **Extra fields** | Custom questions shown on the upload and annotation forms. Allows groups to collect community-specific metadata alongside every contribution. |
 
-Settings like Public/Private and delete are configurable using the group settings. **But currently the extra fields setting is at create time only, so we are requesting group creators to be cautios**. In the upcoming release, we will introduce the ability to have dynamic editing of extra fields. 
+![Group settings](/static/groups/group_settings.png)
 
-![Group Settings](/static/groups/group_settings.png)
+![Delete retention setting](/static/groups/deletion_timelimit.png)
 
-![Group Keep delete for](/static/groups/deletion_timelimit.png)
+## Adding users to a group
 
-You can click on Add users option in group settings, search for users and add them to the group
+In group settings, click **Add users**, search by username, and add them.
 
-![Group Add users](/static/groups/adding_users_to_group.png)
+![Adding users to a group](/static/groups/adding_users_to_group.png)
+
+Only group members and instance admins can add users.

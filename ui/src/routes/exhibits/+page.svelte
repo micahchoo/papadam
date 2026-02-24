@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { exhibits } from '$lib/api';
 	import type { Exhibit } from '$lib/api';
-	import { isAuthenticated, selectedGroup } from '$lib/stores';
+	import { isAuthenticated, selectedGroup, exhibitEnabled } from '$lib/stores';
 
 	let exhibitList = $state<Exhibit[]>([]);
 	let loading = $state(true);
@@ -16,6 +17,10 @@
 	let createError = $state('');
 
 	onMount(async () => {
+		if (!$exhibitEnabled) {
+			await goto('/');
+			return;
+		}
 		try {
 			const { data } = await exhibits.list();
 			exhibitList = data.results;

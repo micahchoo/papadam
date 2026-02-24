@@ -6,6 +6,8 @@ The import-linter contract allows media_relation to import from annotate and
 archive (they are below it in the dependency graph).
 """
 
+from typing import TYPE_CHECKING, cast
+
 import structlog
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -15,6 +17,9 @@ from rest_framework.views import APIView
 
 from papadapi.annotate.models import Annotation
 from papadapi.annotate.serializers import AnnotationSerializer
+
+if TYPE_CHECKING:
+    from papadapi.users.models import User as UserModel
 
 log = structlog.get_logger(__name__)
 
@@ -67,7 +72,7 @@ class AnnotationRepliesView(APIView):
             **data,
             reply_to=parent,
             group=parent.group,
-            created_by=request.user,
+            created_by=cast("UserModel", request.user),
         )
         if "tags" in request.data:
             from papadapi.common.functions import create_or_update_tag

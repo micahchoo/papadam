@@ -9,6 +9,7 @@
  */
 
 import axios from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,8 @@ export interface Annotation {
 	media_target: string;
 	annotation_text: string;
 	annotation_image: string | null;
+	annotation_audio: string | null;
+	annotation_video: string | null;
 	annotation_type: AnnotationType;
 	reply_to: number | null;
 	media_ref_uuid: string | null;
@@ -127,6 +130,50 @@ export interface Exhibit {
 	updated_at: string;
 }
 
+// ── UIConfig types ─────────────────────────────────────────────────────────────
+
+export type UIConfigProfile = 'standard' | 'icon' | 'voice' | 'high-contrast';
+export type UIConfigColorScheme = 'default' | 'warm' | 'cool' | 'high-contrast';
+export type MediaQuality = 'low' | 'medium' | 'high' | 'auto';
+export type TimeRangeInput = 'slider' | 'timestamp' | 'tap';
+
+export interface UIConfigPlayerControls {
+	skip_seconds: [number, number];
+	show_waveform: boolean;
+	show_transcript: boolean;
+	default_quality: MediaQuality;
+}
+
+export interface UIConfigAnnotations {
+	allow_images: boolean;
+	allow_audio: boolean;
+	allow_video: boolean;
+	allow_media_ref: boolean;
+	time_range_input: TimeRangeInput;
+}
+
+export interface UIConfigExhibit {
+	enabled: boolean;
+}
+
+export interface UIConfig {
+	profile: UIConfigProfile;
+	brand_name: string;
+	brand_logo_url: string;
+	primary_color: string;
+	accent_color: string;
+	language: string;
+	icon_set: string;
+	font_scale: number;
+	color_scheme: UIConfigColorScheme;
+	voice_enabled: boolean;
+	offline_first: boolean;
+	player_controls: UIConfigPlayerControls;
+	annotations_config: UIConfigAnnotations;
+	exhibit_config: UIConfigExhibit;
+	updated_at: string | null;
+}
+
 /**
  * Response from archive.create() — MediaStore fields plus the ARQ job ID
  * for the HLS conversion task (null when no conversion is needed, e.g. unknown type).
@@ -148,7 +195,7 @@ export interface TokenPair {
 // ── Client setup ──────────────────────────────────────────────────────────────
 
 async function resolveBaseUrl(): Promise<string> {
-	if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL as string;
+	if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
 	try {
 		const resp = await fetch('/config.json');
 		const cfg = (await resp.json()) as { API_URL?: string };
@@ -159,11 +206,14 @@ async function resolveBaseUrl(): Promise<string> {
 }
 
 let baseURL = '';
+const http = axios.create({ baseURL });
+
+// Propagate the resolved URL into the already-created axios instance.
+// Must come after `http` is declared so the closure captures the binding.
 void resolveBaseUrl().then((url) => {
 	baseURL = url;
+	http.defaults.baseURL = url;
 });
-
-const http = axios.create({ baseURL });
 
 // Attach access token from localStorage on every request
 http.interceptors.request.use((config) => {
@@ -172,23 +222,30 @@ http.interceptors.request.use((config) => {
 	return config;
 });
 
+interface RetryableConfig extends InternalAxiosRequestConfig {
+	_retry?: boolean;
+}
+
 // Attempt JWT refresh on 401; redirect to login on second failure
 http.interceptors.response.use(
 	(r) => r,
-	async (err) => {
-		// err is any (axios); _retry is our custom retry-tracking sentinel on the config
-		const original = err.config;
-		if (err.response?.status === 401 && !original._retry) {
+	async (rawErr: unknown) => {
+		if (!axios.isAxiosError(rawErr)) {
+			return Promise.reject(rawErr instanceof Error ? rawErr : new Error(String(rawErr)));
+		}
+		const original = rawErr.config as RetryableConfig | undefined;
+		if (rawErr.response?.status === 401 && original && !original._retry) {
 			original._retry = true;
 			const refresh = localStorage.getItem('refresh_token');
 			if (refresh) {
 				try {
-					const { data } = await axios.post<{ access: string }>(`${baseURL}/auth/jwt/refresh/`, {
-						refresh
-					});
+					const { data } = await axios.post<{ access: string }>(
+						`${baseURL}/auth/jwt/refresh/`,
+						{ refresh }
+					);
 					localStorage.setItem('access_token', data.access);
-					original.headers.Authorization = `Bearer ${data.access}`;
-					return http(original);
+					original.headers['Authorization'] = `Bearer ${data.access}`;
+					return await http(original);
 				} catch {
 					// refresh also failed — fall through to logout
 				}
@@ -197,7 +254,7 @@ http.interceptors.response.use(
 			localStorage.removeItem('refresh_token');
 			window.location.href = '/auth/login';
 		}
-		return Promise.reject(err);
+		return Promise.reject(rawErr);
 	}
 );
 
@@ -393,6 +450,14 @@ export const mediaRelation = {
 	/** GET /api/v1/media-relation/media-refs/<media_uuid>/ — media_ref annotations pointing at this media */
 	mediaRefs: (mediaUuid: string) =>
 		http.get<Annotation[]>(`/api/v1/media-relation/media-refs/${mediaUuid}/`)
+};
+
+// ── UIConfig ──────────────────────────────────────────────────────────────────
+
+export const uiconfig = {
+	get: () => http.get<UIConfig>('/api/v1/uiconfig/'),
+	patch: (payload: Partial<Omit<UIConfig, 'updated_at'>>) =>
+		http.patch<UIConfig>('/api/v1/uiconfig/', payload)
 };
 
 // ── Import / Export ───────────────────────────────────────────────────────────

@@ -23,21 +23,32 @@ select = [
     "DTZ",  # flake8-datetimez — naive datetime usage
     "ERA",  # eradicate — commented-out code
     "PERF", # perflint — performance anti-patterns
+    "ANN",  # flake8-annotations — enforce type annotations on new code
+    "PGH",  # pygrep-hooks — no blanket type: ignore, must use specific error codes
 ]
 ignore = [
     "S101",   # assert in tests is fine
     "B008",   # DRF uses function calls as default args (e.g. openapi_schema_field)
     "RUF012", # Django class attributes (Meta.ordering, permission_classes, etc.) are fine as lists
+    "ANN401", # Any is sometimes required at external API / library call boundaries
+    "ANN101", # deprecated — type checkers infer self without annotation (removed in future ruff)
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"*/tests/*"    = ["S", "T20"]      # tests can use assert and print
-"*/test*"      = ["S", "T20"]
-"conftest.py"  = ["S"]
+# Tests: assert, print, and unannotated helper functions are fine
+"*/tests/*"    = ["S", "T20", "ANN"]
+"*/test*"      = ["S", "T20", "ANN"]
+"conftest.py"  = ["S", "ANN"]
 "manage*.py"   = ["T20"]
-"*/migrations/*" = ["E501"]        # generated code, long lines expected
+"*/migrations/*" = ["E501", "ANN"]  # generated code — long lines and untyped args expected
 "*/config/*"     = ["S105", "E501"] # dev/test settings: placeholder secrets + long setting values
 "*/archive/views.py" = ["S108"]    # /tmp/upload/ is intentional for the HLS processing pipeline
+# Legacy apps — ANN exempted until progressively annotated (ARCHITECTURE.md Phase 3+)
+"*/common/*"       = ["ANN"]
+"*/users/*"        = ["ANN"]
+"*/archive/*"      = ["ANN"]
+"*/annotate/*"     = ["ANN"]
+"*/importexport/*" = ["ANN"]
 
 [tool.ruff.lint.isort]
 known-first-party = [
@@ -51,10 +62,42 @@ known-first-party = [
 python_version = "3.12"
 plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
 ignore_missing_imports = true
-# Progressive strictness — tighten per phase
+# Global strictness — applied to all modules
 warn_return_any = true
 warn_unused_ignores = true
 no_implicit_reexport = true
+warn_redundant_casts = true
+no_implicit_optional = true
+strict_equality = true
+extra_checks = true
+
+# New apps: enforce full type annotation discipline.
+# Legacy apps (common, users, archive, annotate, importexport) are exempt until
+# progressively annotated — see ARCHITECTURE.md roadmap.
+[[tool.mypy.overrides]]
+module = [
+    "papadapi.crdt.*",
+    "papadapi.events.*",
+    "papadapi.exhibit.*",
+    "papadapi.media_relation.*",
+    "papadapi.queue",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_any_generics = true
+
+# Test modules: exempt from function-annotation enforcement.
+# Consistent with ruff ANN exemption for */tests/*.
+[[tool.mypy.overrides]]
+module = [
+    "papadapi.crdt.tests.*",
+    "papadapi.events.tests.*",
+    "papadapi.exhibit.tests.*",
+    "papadapi.media_relation.tests.*",
+]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
 
 [[tool.mypy.overrides]]
 module = "*.migrations.*"
@@ -74,11 +117,13 @@ asyncio_mode = "auto"   # pytest-asyncio: all async test functions run automatic
 
 addopts = [
     "--strict-markers",
+    "--strict-config",
     "--tb=short",
     "--cov=papadapi",
-    "--cov-report=term-missing",
+    "--cov-branch",                        # measure branch coverage: both arms of each conditional
+    "--cov-report=term-missing:skip-covered",
     "--cov-report=xml",
-    "--cov-fail-under=80",   # CI fails below 80% coverage
+    "--cov-fail-under=80",                 # CI fails below 80%
     "-p", "no:warnings",
 ]
 markers = [

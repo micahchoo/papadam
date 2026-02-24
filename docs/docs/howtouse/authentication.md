@@ -1,29 +1,37 @@
 # Authentication
 
-Papad has a elementary authentication system, featuring a username password based login.  
+papadam uses username and password authentication.
 
-Users can signup to the instance using the following :
+## Signing up
 
-1. username
-2. password
-3. email
-4. first name
-5. last name
+Click **Login** in the navigation bar, then **Create new account**. You will need:
 
-To signup, click on the Login/Signup button in the top of the page, and click on "Create new account" button below and signup
+- Username
+- Password
+- Email
+- First name
+- Last name
 
-![Singup Button](/static/authentication/user_register.png)
+![Sign up form](/static/authentication/user_register.png)
 
-Note: There is currently no feature to authenticate users (like email verification) etc. This is a cautious choice, as papad is usually deployed as a fully offline local network system, so we cant expect users to have access to email. The system's authentication itself is a system of trust and not necessarily a hard way to verify a user.
+**Note:** There is no email verification. papadam is often deployed on local networks
+where users may not have email access. Authentication is a system of trust,
+not identity verification.
 
-Once your signup process is complete, you can login.
+## Logging in
 
-![Login Button](/static/authentication/user_login.png)
+Enter your username and password on the login page.
 
+![Login form](/static/authentication/user_login.png)
 
-Once you login, your screen will be something like below.
+After logging in you are taken to the main page showing your groups.
 
-![User Dashboard](/static/authentication/user_dashboard.png)
+![Dashboard after login](/static/authentication/user_dashboard.png)
 
+## Logging out
 
-Please head over to the dashboard page to understand more. 
+Click **Logout** in the navigation bar. Your session tokens are cleared immediately.
+
+## Forgotten password
+
+Contact your instance admin. Self-service password reset is not yet available.

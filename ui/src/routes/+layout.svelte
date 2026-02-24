@@ -1,16 +1,17 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
 	import { createI18n } from '@inlang/paraglide-sveltekit';
 	import * as runtime from '$lib/i18n/runtime';
-	import * as m from '$lib/i18n/messages';
-	import { loadConfig } from '$lib/config';
-	import { currentUser, isAuthenticated } from '$lib/stores';
+	import NavBar from '$lib/components/NavBar.svelte';
+	import { loadConfig, loadUIConfig } from '$lib/config';
+	import { currentUser, uiConfig } from '$lib/stores';
 	import { auth } from '$lib/api';
 
 	const i18n = createI18n(runtime);
-	const { children } = $props();
+	const { children }: { children: Snippet } = $props();
 
 	onMount(async () => {
 		await loadConfig();
@@ -24,38 +25,26 @@
 				localStorage.removeItem('refresh_token');
 			}
 		}
+		const cfg = await loadUIConfig();
+		if (cfg) {
+			uiConfig.set(cfg);
+			const root = document.documentElement;
+			root.style.setProperty('--brand-primary', cfg.primary_color);
+			root.style.setProperty('--brand-accent', cfg.accent_color);
+			root.style.setProperty('--font-scale', String(cfg.font_scale));
+			root.dataset['profile'] = cfg.profile;
+			root.dataset['colorScheme'] = cfg.color_scheme;
+			if (cfg.voice_enabled) {
+				root.dataset['voice'] = 'true';
+			} else {
+				delete root.dataset['voice'];
+			}
+		}
 	});
 </script>
 
 <ParaglideJS {i18n}>
-	<!-- Navigation -->
-	<nav class="sticky top-0 z-50 flex w-full justify-between bg-blue-950 p-5">
-		<div class="flex items-center justify-center">
-			<a href="/" class="flex items-center text-2xl font-semibold text-white">
-				<h1>Papad.alt</h1>
-			</a>
-		</div>
-
-		<div class="flex justify-center">
-			<div class="flex flex-wrap space-x-4 text-center">
-				<a href="/" class="font-medium text-white hover:text-gray-400">{m.nav_home()}</a>
-				<a href="/groups" class="font-medium text-white hover:text-gray-400"
-					>{m.nav_collections()}</a
-				>
-				<a href="/exhibits" class="font-medium text-white hover:text-gray-400">{m.nav_exhibits()}</a
-				>
-				{#if $isAuthenticated}
-					<a href="/auth/logout" class="font-medium text-white hover:text-gray-400"
-						>{m.nav_logout()}</a
-					>
-				{:else}
-					<a href="/auth/login" class="font-medium text-white hover:text-gray-400"
-						>{m.nav_login()}</a
-					>
-				{/if}
-			</div>
-		</div>
-	</nav>
+	<NavBar />
 
 	<!-- Main Content -->
 	<main class="bg-gray-100">

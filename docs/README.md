@@ -1,16 +1,31 @@
-# Papad Documentation
+# papadam/docs
 
-## How to write docs
+MkDocs documentation site for papadam.
+Fork of [papad-docs](https://gitlab.com/servelots/papad/papad-docs).
 
-1. To add a new option to the menu, please edit mkdocs.yml and refer to "how to use" section and add files accordingly.
-2. To add images (screenshots) store all media in docs/static/section_name/image.png and refer the using markdown.
-3. Everyone should write in the draft branch only, changes to prod branch will be rejected.
+---
 
-## Please know
+## Local preview
 
-There is currently no writing style followed. Please verify the lanaguge and dont write unnecessary things.
+```bash
+docker compose --profile docs up
+# → docs available at http://localhost:8001
+```
 
-## How to check live :
+Or without Docker:
 
-Open a terminal, and type ```docker-compose up``` . The docker-compose features live reload  so all your changes will reflect live.
-## License : CC-By-SA
+```bash
+pip install mkdocs
+mkdocs serve
+```
+
+MkDocs has live reload — changes appear immediately.
+
+---
+
+## Contributing
+
+- Edit files in `docs/docs/`
+- Add new pages to `mkdocs.yml` nav
+- Store screenshots in `docs/static/<section>/`
+- License: CC-BY-SA 4.0

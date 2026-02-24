@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DOMPurify from 'dompurify';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { groups } from '$lib/api';
@@ -63,7 +64,7 @@
 					<div class={`h-60 w-full ${COLORS[index % COLORS.length] ?? 'bg-gray-500'}`}></div>
 					<div class="flex flex-col items-center justify-center p-5 text-center">
 						<h2 class="text-xl font-semibold">{collection.name}</h2>
-						<p class="mt-2 text-gray-600">{@html collection.description}</p>
+						<p class="mt-2 text-gray-600">{@html DOMPurify.sanitize(collection.description)}</p>
 					</div>
 				</div>
 			{/each}

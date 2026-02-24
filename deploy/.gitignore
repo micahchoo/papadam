@@ -3,6 +3,7 @@ db/
 docs/
 ui/
 service_config.env
+.env
 build/
 tasks/
 papad-assets/

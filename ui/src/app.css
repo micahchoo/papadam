@@ -1,3 +1,50 @@
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
+
+/* Brand tokens — defaults match UIConfig model defaults.
+   +layout.svelte overwrites these on mount once UIConfig loads. */
+:root {
+	--brand-primary: #1e3a5f;
+	--brand-accent: #3b82f6;
+	--font-scale: 1;
+	/* Scale all rem-based type with the UIConfig font_scale setting. */
+	font-size: calc(100% * var(--font-scale));
+}
+
+/* ── High-contrast profile ─────────────────────────────────────────────────
+   Activated when UIConfig.profile = 'high-contrast' or
+   UIConfig.color_scheme = 'high-contrast'.
+   Satisfies WCAG AAA contrast (≥ 7:1) for body text. */
+[data-profile='high-contrast'],
+[data-color-scheme='high-contrast'] {
+	--brand-primary: #000000;
+	--brand-accent: #ffdd00;
+	background-color: #ffffff;
+	color: #000000;
+}
+
+[data-profile='high-contrast'] a,
+[data-color-scheme='high-contrast'] a {
+	color: #0000cc;
+	text-decoration: underline;
+}
+
+[data-profile='high-contrast'] button,
+[data-color-scheme='high-contrast'] button {
+	border: 2px solid currentColor;
+	outline-offset: 2px;
+}
+
+/* ── Warm colour scheme ────────────────────────────────────────────────────
+   Reduced blue light; warmer page background. */
+[data-color-scheme='warm'] {
+	background-color: #fdf6ec;
+	color: #2d1a00;
+}
+
+/* ── Cool colour scheme ─────────────────────────────────────────────────── */
+[data-color-scheme='cool'] {
+	background-color: #f0f4f8;
+	color: #0a1628;
+}

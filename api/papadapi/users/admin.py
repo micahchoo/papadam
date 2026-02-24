@@ -1,14 +1,10 @@
 from django.contrib import admin, messages
 from django.contrib.auth.models import Group
-from rest_framework.authtoken.models import TokenProxy as DRFToken
 
 from papadapi.common.admin import BaseAdmin
 from papadapi.users.models import User
 
-# Register your models here.
-
 admin.site.unregister(Group)
-admin.site.unregister(DRFToken)
 
 
 @admin.register(User)

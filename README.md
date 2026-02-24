@@ -7,65 +7,86 @@ Hard fork of [PLASMA/papad](https://gitlab.com/servelots/papad) by [Janastu/Serv
 
 ---
 
+## Get started
+
+| I want to...                  | Guide                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| Deploy papadam on a server    | [SETUP.md](./SETUP.md) — step-by-step Docker deployment with Nginx Proxy Manager |
+| Run papadam on my own machine | [DEVELOPMENT.md](./DEVELOPMENT.md) — local dev with hot-reload                   |
+| Understand the architecture   | [ARCHITECTURE.md](./ARCHITECTURE.md) — system design, constraints, roadmap       |
+
+---
+
 ## What papadam adds over papad
 
-| Feature | papad | papadam |
-|---|---|---|
-| Text annotations on media | ✓ | ✓ |
-| Image annotations pinned to video/audio segments | — | ✓ |
-| Audio/video reply annotations | — | ✓ |
-| Threaded annotation replies (media-to-media dialogue) | — | ✓ |
-| CRDT collaborative + offline annotation | — | ✓ |
-| Exhibit builder with full-archive picker | — | ✓ |
-| UIConfig per-group UI customisation (icon/voice/standard profiles) | — | ✓ |
-| Whisper auto-transcription | — | ✓ optional |
-| Automatic HTTPS (Caddy) | — | ✓ |
-| Architecture enforced by linter (import-linter + eslint-boundaries) | — | ✓ |
-| 80% test coverage gate in CI | — | ✓ |
-| Automated MinIO bucket init | — | ✓ |
-| Automated daily backups | — | ✓ optional |
+| Feature                                                             | papad | papadam    |
+| ------------------------------------------------------------------- | ----- | ---------- |
+| Text annotations on media                                           | ✓     | ✓          |
+| Image annotations pinned to video/audio segments                    | —     | ✓          |
+| Audio/video reply annotations                                       | —     | ✓          |
+| Threaded annotation replies (media-to-media dialogue)               | —     | ✓          |
+| CRDT collaborative + offline annotation                             | —     | ✓          |
+| Exhibit builder with full-archive picker                            | —     | ✓          |
+| UIConfig per-group UI customisation (icon/voice/standard profiles)  | —     | ✓          |
+| Whisper auto-transcription                                          | —     | ✓ optional |
+| Automatic HTTPS (Caddy)                                             | —     | ✓          |
+| Architecture enforced by linter (import-linter + eslint-boundaries) | —     | ✓          |
+| 80% test coverage gate in CI                                        | —     | ✓          |
+| Automated MinIO bucket init                                         | —     | ✓          |
+| Automated daily backups                                             | —     | ✓ optional |
 
 ---
 
 ## Forks
 
-| Directory | Forked from | Original license |
-|-----------|-------------|-----------------|
-| `api/`        | [papad-api](https://gitlab.com/servelots/papad/papad-api) | AGPLv3 |
-| `ui/`         | [custom-ui-papad](https://github.com/Aruvu-collab/custom-ui-papad) `custom-ui/` | AGPLv3 |
-| `deploy/`     | [papad-docker](https://gitlab.com/servelots/papad/papad-docker) | AGPLv3 |
-| `docs/`       | [papad-docs](https://gitlab.com/servelots/papad/papad-docs) | CC-BY-SA 4.0 |
-| `crdt/`       | new | AGPLv3 |
-| `transcribe/` | new | AGPLv3 |
+| Directory     | Forked from                                                                     | Original license |
+| ------------- | ------------------------------------------------------------------------------- | ---------------- |
+| `api/`        | [papad-api](https://gitlab.com/servelots/papad/papad-api)                       | AGPLv3           |
+| `ui/`         | [custom-ui-papad](https://github.com/Aruvu-collab/custom-ui-papad) `custom-ui/` | AGPLv3           |
+| `deploy/`     | [papad-docker](https://gitlab.com/servelots/papad/papad-docker)                 | AGPLv3           |
+| `docs/`       | [papad-docs](https://gitlab.com/servelots/papad/papad-docs)                     | CC-BY-SA 4.0     |
+| `crdt/`       | new                                                                             | AGPLv3           |
+| `transcribe/` | new                                                                             | AGPLv3           |
 
 ---
 
 ## Services
 
-```
-api/          Django REST API       Python 3.12 · Django 4.2 · DRF · PostgreSQL 16 · ARQ · Redis
-ui/           SvelteKit PWA         SvelteKit 2 · Svelte 5 · TypeScript · HLS.js · Y.js · Paraglide
-crdt/         CRDT sync server      Node.js · TypeScript · y-websocket · Redis pub/sub
-transcribe/   Transcription worker  Python · Whisper · ARQ  (optional)
-deploy/       Docker Compose stack  Caddy · PostgreSQL 16 · Redis 7 · MinIO
-docs/         Documentation site    MkDocs
-```
+| Service | Stack | Notes |
+|---|---|---|
+| `api/` | Python 3.12 · Django 4.2 · DRF · PostgreSQL 16 · ARQ · Redis | [api/README.md](./api/README.md) |
+| `ui/` | SvelteKit 2 · Svelte 5 · TypeScript · HLS.js · Y.js · Paraglide | — |
+| `crdt/` | Node.js · TypeScript · y-websocket · Redis pub/sub | [crdt/README.md](./crdt/README.md) |
+| `transcribe/` | Python · Whisper · ARQ | [transcribe/README.md](./transcribe/README.md) · optional profile |
+| `deploy/` | nginx · Caddy (optional) · PostgreSQL 16 · Redis 7 · MinIO | — |
+| `docs/` | MkDocs | — |
 
 ---
 
 ## Quickstart
 
 ```bash
+# 1. Build the SPA
+cd ui && npm install && npm run build && cd ..
+
+# 2. Create env file
 cp deploy/service_config.env.sample deploy/service_config.env
-# edit service_config.env — minimum required: DOMAIN, POSTGRES_PASSWORD, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD
+# edit — minimum required: DJANGO_SECRET_KEY, POSTGRES_PASSWORD, MINIO_ROOT_USER,
+#         MINIO_ROOT_PASSWORD, CRDT_SERVER_TOKEN, PUBLIC_API_URL, PUBLIC_CRDT_URL
 
 cd deploy
+
+# With Nginx Proxy Manager (existing nginx on nginx_network):
+docker compose --profile minio up -d
+
+# Standalone HTTPS via Caddy (no existing nginx — also set DOMAIN in env file):
 docker compose --profile webserver --profile minio up -d
 ```
 
 With Whisper transcription and daily backups:
+
 ```bash
-docker compose --profile webserver --profile minio --profile transcribe --profile backup up -d
+docker compose --profile minio --profile transcribe --profile backup up -d
 ```
 
 ---
@@ -119,6 +140,7 @@ npm run dev
 ## Architecture
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full system design:
+
 - Opinionated backend constraints
 - CRDT layer (Y.js document schema, persistence bridge, offline flow)
 - Media-to-media annotation model (image/audio/video replies, threaded dialogue)

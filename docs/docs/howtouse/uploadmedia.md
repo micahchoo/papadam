@@ -1,21 +1,36 @@
-# Uploading to PAPAD
-Upload an audio or video to Papad by using Upload Form with Name, Description,Tags and Media. Where Name and Image are mandatory.
+# Uploading media
 
-![UploadForm](/static/groups/group_settings.png)
+You can upload audio and video files to any group you are a member of.
 
-## Uploading a Video/Audio
-While uploading a Video we fill the fields and submit.
+## How to upload
 
-**Mandatory Fields**:
+1. Open a group's archive page.
+2. Click the **Upload** button.
+3. Fill in the form:
+   - **Name** (required)
+   - **Description** (optional)
+   - **Tags** (optional — comma-separated)
+   - **File** (required — audio or video)
+4. Click **Upload**.
 
-The Name, Image are mandatory fields are when miss out filling you get a pop up alert to remind.
+![Upload form](/static/uploadmedia/onSubmit.png)
 
-**Buttons**:
+## What happens after upload
 
-`Upload` and `Cancel`
-![UploadForm](/static/uploadmedia/onSubmit.png)
+The file is uploaded to storage and a background job starts to transcode it to HLS
+(adaptive bitrate streaming). A progress indicator shows the job status.
 
-**View Uploaded media**:
+Once transcoding is complete, the media is available in the group archive for playback and annotation.
 
-`Successfully submitted`
-![UploadForm](/static/uploadmedia/postUpload.png)
+![Upload complete](/static/uploadmedia/postUpload.png)
+
+## Supported formats
+
+Audio: MP3, OGG, WAV, M4A, FLAC, and others supported by ffmpeg.
+Video: MP4, WebM, MKV, MOV, and others supported by ffmpeg.
+
+All files are converted to HLS for adaptive streaming.
+
+## File size
+
+Contact your instance admin for the configured upload limit (default: 500MB per file).

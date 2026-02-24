@@ -1,33 +1,58 @@
-# Annotation
-Annotation feature allows to talk over a running audio or video, by adding start and end time of the audio, annotating text, with or without annotating image. Would ideally move from image to support multi media - audio, video along with image.
+# Annotating media
 
-## Annotating a Video
-While uploading a Video we fill the fields and submit.
+Annotations let you add commentary, responses, or context to any point in an audio or video file.
+Annotations can be time-anchored to a specific segment.
 
-**Annotation Page**:
+## Adding an annotation
 
-Start and end time are mandatory, play the video and from the point of time you want to start the annotation click on `Start Time` and similarly when you wanna end annotation click on `End Time` and to next click on the button `annotate` that will open a modal fill the annotation text and tags if required go for upload and you are done !!.
-![Annotate](/static/annotate/annotatePage.png)
+1. Open a media item.
+2. Play the media and note the start and end time of the segment you want to annotate.
+3. Click **Annotate** to open the annotation form.
+4. Fill in:
+   - **Start time / End time** — the segment this annotation refers to (click at the right moment during playback to capture the time)
+   - **Annotation text** (required)
+   - **Tags** (optional)
+5. Click **Upload**.
 
-**Mandatory Fields**:
+![Annotation page](/static/annotate/annotatePage.png)
 
-The Annotation Text is mandatory field, when miss out filling you get a pop up alert to remind. Start and end time are mandatory, whereas MEdia target is not allowed to edit as it comes from start and end time from the annotation page. Tags are optional.
-And to annotate submit button `Upload`.
-![Annotate](/static/annotate/mandatoryFields.png)
+![Annotation form](/static/annotate/mandatoryFields.png)
 
-**Buttons**:
+## Annotation types
 
-`Upload` and `Cancel`, cancel resets the input fields. Upload submits the form.
-![Annotate](/static/annotate/onSub.png)
+| Type | Description |
+|---|---|
+| **Text** | Standard text annotation |
+| **Image** | An image pinned to a segment — displayed as an overlay during playback |
+| **Audio reply** | A spoken response — transcoded and playable inline |
+| **Video reply** | A video response — transcoded and playable inline |
+| **Media reference** | Links an existing archive item as a reply |
 
-**View Uploaded media**:
+Not all types may be enabled on every group — ask your group admin.
 
-`Successfully submitted`
-![Annotate](/static/annotate/AnnoSuccess.png)
+## Threaded replies
 
-## Uploading an Audio
+Any annotation can have replies. Click **Reply** on an annotation to add your response.
+Replies can also be time-anchored and can use any annotation type.
 
-Annotating an audio to follows the same procedure just the media format here is Audio.
+This creates a dialogue thread across the archive — a community member's story can accumulate
+text replies, voice replies, and video responses from multiple contributors.
 
-![Annotate](/static/annotate/AudioAnnoPage.png)
+## Viewing annotations
 
+All annotations for a media item are listed below the player, grouped by time segment.
+Replies appear indented under their parent annotation.
+
+![Annotation submitted](/static/annotate/AnnoSuccess.png)
+
+## Annotating audio
+
+The same form applies to audio files. The media player shows the waveform and playback position.
+
+![Audio annotation page](/static/annotate/AudioAnnoPage.png)
+
+## Collaborative annotation
+
+If multiple people are viewing the same media at the same time, annotations sync in real time
+using CRDT (conflict-free replicated data). If you are offline, annotations are saved locally
+and sync when you reconnect — no data is lost.

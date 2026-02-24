@@ -1,9 +1,11 @@
+from typing import Any
+
 from rest_framework import serializers
 
 from papadapi.exhibit.models import Exhibit, ExhibitBlock
 
 
-class ExhibitBlockSerializer(serializers.ModelSerializer):
+class ExhibitBlockSerializer(serializers.ModelSerializer[ExhibitBlock]):
     class Meta:
         model = ExhibitBlock
         fields = (
@@ -17,7 +19,7 @@ class ExhibitBlockSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "created_at")
 
-    def validate(self, attrs: dict) -> dict:
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         block_type = attrs.get("block_type", ExhibitBlock.BlockType.MEDIA)
         if block_type == ExhibitBlock.BlockType.MEDIA and not attrs.get("media_uuid"):
             raise serializers.ValidationError(
@@ -32,7 +34,7 @@ class ExhibitBlockSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ExhibitSerializer(serializers.ModelSerializer):
+class ExhibitSerializer(serializers.ModelSerializer[Exhibit]):
     blocks = ExhibitBlockSerializer(many=True, read_only=True)
 
     class Meta:
@@ -52,9 +54,10 @@ class ExhibitSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "uuid", "created_by", "created_at", "updated_at")
 
 
-class ExhibitWriteSerializer(serializers.ModelSerializer):
+class ExhibitWriteSerializer(serializers.ModelSerializer[Exhibit]):
     """Used for create/update — excludes nested blocks (managed separately)."""
 
     class Meta:
         model = Exhibit
-        fields = ("title", "description", "is_public", "group")
+        fields = ("uuid", "title", "description", "is_public", "group")
+        read_only_fields = ("uuid",)

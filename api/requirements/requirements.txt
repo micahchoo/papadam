@@ -34,6 +34,7 @@ django-cors-headers
 
 # Environment
 environs
+django-configurations
 
 # Task queue (Redis-backed)
 arq

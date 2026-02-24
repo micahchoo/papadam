@@ -2,10 +2,12 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import DOMPurify from 'dompurify';
 	import { archive, annotations as annoApi } from '$lib/api';
 	import type { MediaStore, Annotation } from '$lib/api';
 	import AnnotationViewer from '$lib/components/AnnotationViewer.svelte';
 	import MediaPlayer from '$lib/components/MediaPlayer.svelte';
+	import type { ImageAnnotation } from '$lib/components/MediaPlayer.svelte';
 	import UploadAnnotationModal from '$lib/components/UploadAnnotationModal.svelte';
 	import EditMediaModal from '$lib/components/EditMediaModal.svelte';
 
@@ -25,6 +27,15 @@
 	let mediaDescription = $state('');
 
 	let mediaPlayerRef = $state<{ playSnippet: (start: number, end: number) => void } | null>(null);
+
+	/** Image annotations whose annotation_image is set — passed to MediaPlayer for overlay. */
+	const imageAnnotations = $derived(
+		annotations
+			.filter((a): a is Annotation & { annotation_image: string } =>
+				a.annotation_type === 'image' && a.annotation_image !== null
+			)
+			.map((a): ImageAnnotation => ({ media_target: a.media_target, annotation_image: a.annotation_image }))
+	);
 
 	onMount(async () => {
 		try {
@@ -49,6 +60,10 @@
 
 	function handlePlaySnippet(start: number, end: number) {
 		mediaPlayerRef?.playSnippet(start, end);
+	}
+
+	function handleAnnotationDeleted(id: number) {
+		annotations = annotations.filter((a) => a.id !== id);
 	}
 
 	function editMedia() {
@@ -111,7 +126,7 @@
 				{/if}
 			</div>
 
-			<MediaPlayer bind:this={mediaPlayerRef} src={recording.upload ?? ''} controls={true} />
+			<MediaPlayer bind:this={mediaPlayerRef} src={recording.upload ?? ''} controls={true} {imageAnnotations} />
 
 			<h1 class="mt-4 text-2xl font-bold">{recording.name}</h1>
 			<p class="text-sm text-gray-500">
@@ -128,7 +143,8 @@
 					{/if}
 				{/each}
 			</div>
-			<p class="my-3">{@html recording.description}</p>
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+		<p class="my-3">{@html DOMPurify.sanitize(recording.description)}</p>
 		</div>
 
 		<!-- Right: annotations -->
@@ -145,7 +161,7 @@
 				</div>
 				{#key annotations}
 					<div class="mt-2">
-						<AnnotationViewer {annotations} onPlaySnippet={handlePlaySnippet} {formatTime} />
+						<AnnotationViewer {annotations} onPlaySnippet={handlePlaySnippet} {formatTime} onAnnotationDeleted={handleAnnotationDeleted} />
 					</div>
 				{/key}
 			</div>

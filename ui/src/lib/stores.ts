@@ -9,7 +9,7 @@
  */
 
 import { writable, derived } from 'svelte/store';
-import type { User, Group, MediaStore } from '$lib/api';
+import type { UIConfig, User, Group, MediaStore, AnnotationType, TimeRangeInput } from '$lib/api';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -68,3 +68,37 @@ export const playbackPosition = writable<number>(0);
 export const isUploadModalOpen = writable<boolean>(false);
 export const isAnnotateModalOpen = writable<boolean>(false);
 export const isEditMediaModalOpen = writable<boolean>(false);
+
+// ── UIConfig ──────────────────────────────────────────────────────────────────
+
+/** Instance UIConfig loaded from /api/v1/uiconfig/ on mount. */
+export const uiConfig = writable<UIConfig | null>(null);
+
+/** True when the Exhibits feature is enabled (UIConfig.exhibit_config.enabled; default true). */
+export const exhibitEnabled = derived(uiConfig, ($c) => $c?.exhibit_config.enabled ?? true);
+
+/**
+ * Annotation types allowed by UIConfig.annotations_config.
+ * 'text' is always present. When UIConfig is not yet loaded, all types are shown.
+ */
+export const allowedAnnotationTypes = derived(uiConfig, ($c): AnnotationType[] => {
+	if (!$c) return ['text', 'image', 'audio', 'video', 'media_ref'];
+	const types: AnnotationType[] = ['text'];
+	if ($c.annotations_config.allow_images) types.push('image');
+	if ($c.annotations_config.allow_audio) types.push('audio');
+	if ($c.annotations_config.allow_video) types.push('video');
+	if ($c.annotations_config.allow_media_ref) types.push('media_ref');
+	return types;
+});
+
+/** Skip-seconds pair [backward, forward] from UIConfig.player_controls; default [10, 30]. */
+export const playerSkipSeconds = derived(
+	uiConfig,
+	($c): [number, number] => $c?.player_controls.skip_seconds ?? [10, 30]
+);
+
+/** Time range input mode from UIConfig.annotations_config; default 'slider'. */
+export const timeRangeInputMode = derived(
+	uiConfig,
+	($c): TimeRangeInput => $c?.annotations_config.time_range_input ?? 'slider'
+);

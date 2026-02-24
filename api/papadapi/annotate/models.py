@@ -32,6 +32,16 @@ def upload_to(instance, filename):
     return f"annotate/{hash_file(instance.annotation_image)}{filename_ext}"
 
 
+def upload_to_audio(instance, filename):
+    _, filename_ext = os.path.splitext(filename)
+    return f"annotate/audio/{uuid.uuid4()}{filename_ext}"
+
+
+def upload_to_video(instance, filename):
+    _, filename_ext = os.path.splitext(filename)
+    return f"annotate/video/{uuid.uuid4()}{filename_ext}"
+
+
 class Annotation(models.Model):
 
     class AnnotationType(models.TextChoices):
@@ -50,6 +60,12 @@ class Annotation(models.Model):
     annotation_text = RichTextField(_("Annotation text"))
     annotation_image = models.ImageField(
         _("Annotation Reference Image"), upload_to=upload_to, blank=True, null=True
+    )
+    annotation_audio = models.FileField(
+        _("Annotation Audio File"), upload_to=upload_to_audio, blank=True, null=True
+    )
+    annotation_video = models.FileField(
+        _("Annotation Video File"), upload_to=upload_to_video, blank=True, null=True
     )
     tags = models.ManyToManyField("common.Tags", verbose_name=_("tags"))
     is_public = models.BooleanField(_("Public"), default=True)
@@ -111,8 +127,7 @@ class Annotation(models.Model):
         try:
             m = MediaStore.objects.get(uuid=uuid.UUID(self.media_reference_id))
             return m.group if m.group else None
-        except MediaStore.DoesNotExist as e:
-            logger.error(f"MediaStore not found: {e}")
+        except (MediaStore.DoesNotExist, ValueError):
             return None
 
     def save(self, *args, **kwargs):

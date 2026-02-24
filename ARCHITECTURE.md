@@ -39,7 +39,7 @@ papadam/
 ║  │ icon/voice │  │ CRDT      │  │ player   │  │ background sync     │  ║
 ║  └────────────┘  └───────────┘  └──────────┘  └─────────────────────┘  ║
 ╠══════╤══════════════════════════════════╤═══════════════════════════════╣
-║      │  REST / SSE (HTTPS — Caddy)      │  WebSocket                    ║
+║      │  REST / SSE (HTTPS — reverse proxy)  │  WebSocket                ║
 ╠══════╪══════════════════════════════════╪═══════════════════════════════╣
 ║      ▼                                  ▼                               ║
 ║  ┌─────────────────────────┐  ┌──────────────────────────────────────┐  ║
@@ -163,12 +163,13 @@ The module dependency graph in `ui/` is enforced by `eslint-plugin-boundaries`:
 
 ```
 api.ts       → leaf (no internal imports — pure HTTP client)
+events.ts    → api only
 crdt.ts      → may import: stores
 config.ts    → may import: api
 stores.ts    → may import: config, crdt
 i18n/        → leaf
 primitives/  → leaf (unstyled components, no business logic)
-components/  → may import: api, stores, config, i18n, primitives
+components/  → may import: api, stores, config, events, i18n, primitives
 routes/      → may import: everything
 ```
 
@@ -356,35 +357,46 @@ GET    /api/v1/exhibit/{uuid}/publish/         public render — no auth require
 ## Frontend — UIConfig Customisation System
 
 ```typescript
+// ui/src/lib/api.ts — authoritative; backend mirrors via common.UIConfig model
 interface UIConfig {
   profile: 'standard' | 'icon' | 'voice' | 'high-contrast'
+  brand_name: string
+  brand_logo_url: string
+  primary_color: string         // hex, e.g. "#1e3a5f"
+  accent_color: string          // hex
   language: string              // BCP 47 — 'kn', 'hi', 'ta', 'en', etc.
-  iconSet: string               // 'default' | custom MinIO URL to icon sprite
-  fontScale: number             // 1.0 default, 1.4–1.8 for low-vision
-  colorScheme: 'default' | 'warm' | 'cool' | 'high-contrast'
-  voiceEnabled: boolean
-  offlineFirst: boolean
-  playerControls: {
-    skipSeconds: [number, number]
-    showWaveform: boolean
-    showTranscript: boolean
-    defaultQuality: 'low' | 'medium' | 'high' | 'auto'
+  icon_set: string              // 'default' | custom MinIO URL to icon sprite
+  font_scale: number            // 1.0 default, 1.4–1.8 for low-vision
+  color_scheme: 'default' | 'warm' | 'cool' | 'high-contrast'
+  voice_enabled: boolean
+  offline_first: boolean
+  player_controls: {
+    skip_seconds: [number, number]
+    show_waveform: boolean
+    show_transcript: boolean
+    default_quality: 'low' | 'medium' | 'high' | 'auto'
   }
-  annotations: {
-    allowImages: boolean
-    allowAudio: boolean          // voice reply annotations
-    allowVideo: boolean          // video reply annotations
-    allowMediaRef: boolean       // link existing archive items as replies
-    timeRangeInput: 'slider' | 'timestamp' | 'tap'
+  annotations_config: {
+    allow_images: boolean
+    allow_audio: boolean         // voice reply annotations
+    allow_video: boolean         // video reply annotations
+    allow_media_ref: boolean     // link existing archive items as replies
+    time_range_input: 'slider' | 'timestamp' | 'tap'
   }
-  exhibit: {
+  exhibit_config: {
     enabled: boolean
   }
+  updated_at: string | null
 }
 ```
 
-Config is stored per-group in `group_extra_questions`.
+Config is stored per-group in `common.UIConfig` (Django model, OneToOneField → Group).
+`group_extra_questions` is legacy — do not add new config keys there.
 One running instance serves all profiles. No custom builds. No per-community deployments.
+
+> **Type-safety:** UIConfig `profile` and `color_scheme` are `TextChoices` enums (not raw strings).
+> Frontend UIConfig types are derived from backend field names (snake_case throughout).
+> Discriminated union approach for profile switching is deferred to Phase 5 work.
 
 ### Interaction profiles
 
@@ -399,12 +411,13 @@ One running instance serves all profiles. No custom builds. No per-community dep
 
 ```
 api.ts        leaf — pure HTTP, no internal imports
+events.ts     → api only
 crdt.ts       → stores only
 config.ts     → api only
 stores.ts     → config, crdt
 i18n/         leaf
 primitives/   leaf — unstyled accessible components (bits-ui wrappers)
-components/   → api, stores, config, i18n, primitives
+components/   → api, stores, config, events, i18n, primitives
 routes/       → anything in lib/
 ```
 
@@ -458,36 +471,45 @@ Run all checks: `npm run lint && npm run check && npm run test:all`
 | `redis` | redis:7-alpine | always | AOF persistence enabled |
 | `minio` | quay.io/minio/minio | `minio` | healthcheck: /minio/health/live |
 | `minio-init` | quay.io/minio/mc | `minio` | creates bucket + sets public policy, exits |
-| `api` | build: ../api | always | healthcheck: /healthcheck/ |
+| `api` | build: ../api | always | Django; healthcheck: /healthcheck/; container: papadam-api |
 | `bg-app` | build: ../api | always | ARQ worker |
-| `crdt` | build: ../crdt | always | y-websocket, healthcheck: /health |
-| `caddy` | caddy:2-alpine | `webserver` | automatic HTTPS via Let's Encrypt |
+| `crdt` | build: ../crdt | always | y-websocket; healthcheck: /health; container: papadam-crdt |
+| `ui` | nginx:stable-alpine | always | serves ui/build/ SPA; container: papadam-ui |
+| `caddy` | caddy:2-alpine | `webserver` | standalone HTTPS via Let's Encrypt (alternative to NPM) |
 | `transcribe` | build: ../transcribe | `transcribe` | 2GB memory limit |
 | `docs` | build: ../docs | `docs` | MkDocs |
 | `backup` | postgres-backup-local | `backup` | daily, 7-day + 4-week + 6-month retention |
 
-### Caddyfile (replaces nginx/ for HTTPS deployments)
+### Reverse proxy
 
+Two supported options:
+
+**Nginx Proxy Manager (recommended for servers with existing nginx):**
+`papadam-api`, `papadam-crdt`, and `papadam-ui` join `nginx_network` (external).
+NPM routes `/api/`, `/auth/`, `/nimda/`, `/config.json`, `/healthcheck/` → `papadam-api:8000`;
+`/ws/` → `papadam-crdt:1234/` (WebSocket, strips prefix); all else → `papadam-ui:80` (SPA fallback).
+
+**Caddy (`--profile webserver`):**
 ```
 {$DOMAIN} {
     reverse_proxy /api/*     api:8000
     reverse_proxy /auth/*    api:8000
     reverse_proxy /nimda/*   api:8000
-    reverse_proxy /static/*  api:8000
-    reverse_proxy /schema/*  api:8000
+    reverse_proxy /config.json  api:8000
     reverse_proxy /ws/*      crdt:1234
-    reverse_proxy /minio/*   minio:9000
-    reverse_proxy /docs/*    docs:8001
     root * /srv/ui
     file_server
     try_files {path} /index.html
     encode gzip
-    request_body { max_size 500MB }
-    header { X-Content-Type-Options nosniff; X-Frame-Options DENY }
 }
 ```
-
 `DOMAIN` is the only required variable. Let's Encrypt cert provisioning is automatic.
+
+### Runtime config injection
+
+Django serves `GET /config.json` → `{"API_URL": "...", "CRDT_URL": "..."}`.
+The SPA fetches this on startup (`src/lib/config.ts`). Set `PUBLIC_API_URL` and `PUBLIC_CRDT_URL` in `service_config.env`.
+Local dev: set `VITE_API_URL` + `VITE_CRDT_URL` in `ui/.env.local` instead.
 
 ---
 
@@ -507,31 +529,44 @@ Run all checks: `npm run lint && npm run check && npm run test:all`
 - Annotation model extended: `annotation_type`, `reply_to`, `media_ref_uuid`
 - import-linter: 10 contracts, all passing (legacy violations documented as exemptions)
 
-### Phase 2 — Frontend rebuild
-- Typed API client (`ui/src/lib/api.ts`)
-- Full page parity: auth, dashboard, collection, media, upload, search
-- HLS.js player with waveform
-- SSE progress bar for upload/transcode
-- Y.js CRDT annotations (collaborative + offline)
+### Phase 2 — Frontend rebuild ✓ COMPLETE
+- Typed API client (`ui/src/lib/api.ts`) — all endpoints covered
+- Full page parity: auth (login/register/logout), groups, media detail, upload, exhibit
+- HLS.js player (audio + video, adaptive bitrate)
+- SSE progress bar for upload/transcode jobs
+- Y.js CRDT annotations (collaborative + offline, y-indexeddb persistence)
+- Threaded reply display in AnnotationViewer
+- Exhibit viewer + basic exhibit editor
 - ESLint + svelte-check + eslint-boundaries wired to CI
-- Vitest unit tests + Playwright E2E
-- i18n skeleton (Paraglide)
+- Vitest unit tests (83 tests, 97%+ line coverage) + Playwright E2E smoke
+- i18n skeleton (Paraglide, English catalog)
+- adapter-static SPA build → `ui/build/` served by nginx container
 
 ### Phase 3 — Media depth + inclusivity
-- Media-to-media annotation types (image overlay, audio reply, video reply, media_ref)
-- Threaded annotation reply tree + API
-- Whisper transcribe worker (optional docker profile)
-- Service worker + offline annotation queue + background sync
-- WCAG AA audit + fixes across all components
+- [ ] Image overlay annotations during video/audio playback
+- [ ] Audio + video reply annotation upload UI (backend needs new file fields; API model has `annotation_image` only)
+- [ ] Whisper transcript display in media player
+- [ ] Service worker + offline annotation queue + background sync
+- [ ] WCAG AA audit + fixes
 
-### Phase 4 — Exhibit builder
-- `exhibit/` Django app: Exhibit + ExhibitBlock models + API
-- Archive picker UI (multi-filter: group, tags, type, date, author, transcript)
-- Exhibit editor UI (block drag/keyboard reorder, segment clipper)
-- Public exhibit render (no auth, SEO-friendly)
-- UIConfig `icon` and `voice` interaction profiles
+### Phase 4 — UIConfig wiring + exhibit gating ✓ COMPLETE
+- [x] UIConfig model (`common.UIConfig`, OneToOneField → Group) + `/api/v1/uiconfig/` endpoint
+- [x] Seed commands (`seed_dev`, `seed_prod`) — idempotent, env-driven
+- [x] Frontend UIConfig store + CSS var application on mount
+- [x] Settings page (auth-gated UIConfig editor, live CSS preview)
+- [x] Derived stores for all sub-features (`exhibitEnabled`, `allowedAnnotationTypes`, `playerSkipSeconds`, `timeRangeInputMode`)
+- [x] Exhibit nav link + routes gated by `exhibit_config.enabled`
+- [x] Annotation type filter via `annotations_config.allow_*`
+- [x] Skip buttons wired to `player_controls.skip_seconds`
+- [x] Tap mode for annotation time range (`annotations_config.time_range_input`)
+- [x] Image file upload + `media_ref_uuid` input in annotation modal
+- [x] `[data-profile]` / `[data-color-scheme]` HTML attributes + high-contrast / warm / cool CSS
+- [x] DOMPurify sanitization on `{@html}` in exhibit viewer
+- [ ] Full archive picker (multi-filter: tags, type, date, author, transcript) — Phase 5
+- [ ] Block drag/keyboard reorder — Phase 5
+- [ ] `icon` and `voice` interaction profiles full rendering — Phase 5
 
-### Phase 5 — Federation (future)
+### Phase 5 — Exhibit builder depth + federation (future)
 - ActivityPub for cross-instance archive sharing
 - Import/export in open formats (building on existing tarball system)
 - Decentralised identity (DID) for community members

@@ -1,3 +1,4 @@
+import contextlib
 from datetime import timedelta
 
 from django.db.models import Count, Q
@@ -72,10 +73,9 @@ class AnnotationCreateSet(
                 group_list = search_collections.split(",")
                 group_query = Q(mediagroup__in=Group.objects.filter(id__in=group_list))
             else:
-                error_message = "No results found for the given search criteria."
-                return Response(
-                    {"detail": error_message}, status=status.HTTP_404_NOT_FOUND
-                )
+                # No recognised search_from — return empty queryset rather than
+                # a Response object (which would crash the paginator).
+                return Annotation.objects.none()
 
         final_query = query & group_query if query else group_query
         if final_query:
@@ -89,23 +89,48 @@ class AnnotationCreateSet(
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        files = request.FILES.get("annotation_image", None)
 
         # Mandatory fields
         media_reference_id = data["media_reference_id"]
-        annotation_text = data["annotation_text"]
+        annotation_text = data.get("annotation_text", "")
         media_target = data["media_target"]
+
+        # Optional typed fields
+        annotation_type = data.get("annotation_type", Annotation.AnnotationType.TEXT)
+        media_ref_uuid_raw = data.get("media_ref_uuid") or None
+        reply_to_raw = data.get("reply_to") or None
 
         m = Annotation.objects.create(
             media_reference_id=media_reference_id,
             annotation_text=annotation_text,
             media_target=media_target,
+            annotation_type=annotation_type,
+            media_ref_uuid=media_ref_uuid_raw,
             created_by=self.request.user,
         )
-        m.annotation_image = files
+
+        # File fields — assigned after create so upload_to functions run
+        image_file = request.FILES.get("annotation_image")
+        audio_file = request.FILES.get("annotation_audio")
+        video_file = request.FILES.get("annotation_video")
+        if image_file:
+            m.annotation_image = image_file
+        if audio_file:
+            m.annotation_audio = audio_file
+        if video_file:
+            m.annotation_video = video_file
+
+        if reply_to_raw is not None:
+            with contextlib.suppress(Annotation.DoesNotExist, ValueError, TypeError):
+                m.reply_to = Annotation.objects.get(id=int(reply_to_raw))
+
         m.save()
-        for tag in data["tags"].split(","):
-            m.tags.add(create_or_update_tag(tag))
+
+        for tag in data.get("tags", "").split(","):
+            tag = tag.strip()
+            if tag:
+                m.tags.add(create_or_update_tag(tag))
+
         serializer = AnnotationSerializer(m)
         return Response(serializer.data)
 
@@ -138,22 +163,38 @@ class AnnotationRetreiveSet(
 
     def update(self, request, *args, **kwargs):
         data = request.data
-        files = request.FILES.get("annotation_image", None)
 
         obj = self.get_object()
         m = Annotation.objects.get(id=obj.id)
+
         if "annotation_text" in data:
             m.annotation_text = data["annotation_text"]
+        if "annotation_type" in data:
+            m.annotation_type = data["annotation_type"]
         if "media_target" in data:
             m.media_target = data["media_target"]
+        if "media_ref_uuid" in data:
+            m.media_ref_uuid = data["media_ref_uuid"] or None
+
         if "tags" in data:
             for tag in m.tags.all():
                 m.tags.remove(tag)
                 recalculate_tag_count(tag)
             for tag in data["tags"].split(","):
-                m.tags.add(create_or_update_tag(tag))
-        if files:
-            m.annotation_image = files
+                tag = tag.strip()
+                if tag:
+                    m.tags.add(create_or_update_tag(tag))
+
+        image_file = request.FILES.get("annotation_image")
+        audio_file = request.FILES.get("annotation_audio")
+        video_file = request.FILES.get("annotation_video")
+        if image_file:
+            m.annotation_image = image_file
+        if audio_file:
+            m.annotation_audio = audio_file
+        if video_file:
+            m.annotation_video = video_file
+
         m.save()
         serializer = AnnotationSerializer(m)
         return Response(serializer.data, status=status.HTTP_200_OK)

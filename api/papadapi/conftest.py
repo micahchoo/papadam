@@ -64,10 +64,8 @@ class AnnotationFactory(DjangoModelFactory):
     class Meta:
         model = Annotation
 
-    media_reference_id = factory.LazyAttribute(
-        lambda o: f"http://example.com/api/v1/archive/{o.media.uuid}/"
-        if hasattr(o, "media") else "http://example.com/api/v1/archive/test/"
-    )
+    # The frontend sends the bare media UUID as media_reference_id (not a full URL).
+    media_reference_id = "00000000-0000-0000-0000-000000000000"
     media_target = "t=0,10"
     annotation_text = factory.Faker("sentence")
     annotation_type = Annotation.AnnotationType.TEXT
@@ -114,7 +112,7 @@ def media(db, group):
 @pytest.fixture
 def annotation(db, media, group):
     return AnnotationFactory(
-        media_reference_id=f"http://testserver/api/v1/archive/{media.uuid}/",
+        media_reference_id=str(media.uuid),
         group=group,
     )
 
@@ -131,6 +129,21 @@ def auth_client(api_client, user):
     refresh = RefreshToken.for_user(user)
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return api_client
+
+
+@pytest.fixture
+def member_media(db, group_with_member):
+    """A MediaStore in the group that member_client belongs to."""
+    return MediaStoreFactory(group=group_with_member)
+
+
+@pytest.fixture
+def member_annotation(db, member_media, group_with_member):
+    """An Annotation whose media is in the member's group."""
+    return AnnotationFactory(
+        media_reference_id=str(member_media.uuid),
+        group=group_with_member,
+    )
 
 
 @pytest.fixture

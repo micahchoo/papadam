@@ -27,6 +27,7 @@ from papadapi.archive.views import (
     MediaStoreRemoveTag,
     MediaStoreUpdateSet,
 )
+from papadapi.common.uiconfig_views import UIConfigView
 from papadapi.common.views import (
     AddCustomQuestionFromGroupView,
     AddUserFromGroupView,
@@ -36,6 +37,7 @@ from papadapi.common.views import (
     InstanceGroupStats,
     RemoveCustomQuestionFromGroupView,
     RemoveUserFromGroupView,
+    RuntimeConfigView,
     TagsViewSet,
     UpdateCustomQuestionFromGroupView,
     UpdateGroupViewSet,
@@ -153,6 +155,7 @@ urlpatterns = [
     path("api/v1/events/", include("papadapi.events.urls")),
     path("api/v1/exhibit/", include("papadapi.exhibit.urls")),
     path("api/v1/media-relation/", include("papadapi.media_relation.urls")),
+    path("api/v1/uiconfig/", UIConfigView.as_view(), name="uiconfig"),
 
     # ── Auth — djoser (user management) + simplejwt (tokens) ─────────────────
     re_path(r"^auth/", include("djoser.urls")),
@@ -173,6 +176,9 @@ urlpatterns = [
 
     # ── Health ────────────────────────────────────────────────────────────────
     path("healthcheck/", HealthCheck.as_view(), name="healthcheck"),
+
+    # ── Runtime config (fetched by SvelteKit SPA on startup) ─────────────────
+    path("config.json", RuntimeConfigView.as_view(), name="runtime-config"),
 ]
 
 if settings.DEBUG:

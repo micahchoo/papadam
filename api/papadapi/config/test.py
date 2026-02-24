@@ -155,7 +155,7 @@ SPECTACULAR_SETTINGS = {
 
 # ── Rich text ─────────────────────────────────────────────────────────────────
 
-DJRICHTEXTFIELD_SETTINGS = {}
+DJRICHTEXTFIELD_SETTINGS: dict[str, object] = {}
 
 # ── Static ────────────────────────────────────────────────────────────────────
 

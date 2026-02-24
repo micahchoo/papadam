@@ -1,14 +1,42 @@
-## Creating Admin user
+# Creating an admin user
 
-**Known Limit** : Only instance admin with access to the server can do the following actions. It is intended that way and will not change.
+**Note:** Only someone with access to the server (SSH or Portainer console) can do this.
+Admin accounts are intentional not self-serve.
 
-### Steps to create a super user
+## Steps
 
-1. cd to your papad-docker repository
-2. ```docker-compose ps``` to ensure all your containers are running
-3. ``` docker exec -it papad-docker_papad_api_1  bash ``` this command will take you inside the api container
-4. ``` pip install -r requirements-dev.txt ``` This will install all required developer based python dependencies. We are working on overcoming this step but is currently not ready
-5. ``` python manage-prod.py createsuperuser ``` Follow the on-screen instructions and please ensure to give an accurate email and name. We display this email and name to all users to ensure they know who to contact for support.
-6. ``` exit ```
+1. Ensure all containers are running:
 
-Now open <your-instanace-url>/nimda/ for the admin site to load
+   ```bash
+   docker compose ps
+   ```
+
+2. Open a shell inside the API container:
+
+   ```bash
+   docker exec -it papadam-api bash
+   ```
+
+3. Create the superuser:
+
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+   Follow the prompts. Use a real email — it is displayed to users as a support contact.
+
+4. Exit the container:
+
+   ```bash
+   exit
+   ```
+
+5. Open the admin site at `https://your-domain/nimda/`
+
+## What admins can do
+
+- Create and manage groups
+- Manage users and group membership
+- Withhold or restore content at the instance level
+- Trigger exports and view import/export history
+- Inspect annotation and media records

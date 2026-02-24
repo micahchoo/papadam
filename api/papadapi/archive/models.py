@@ -75,7 +75,7 @@ class MediaStore(models.Model):
         on_delete=models.CASCADE,
         default=1,
     )
-    extra_group_response = models.JSONField(blank=True, null=True, default=[])
+    extra_group_response = models.JSONField(blank=True, null=True, default=list)
     is_delete = models.BooleanField(_("User requested soft delete ?"), default=False)
     is_instance_admin_withheld = models.BooleanField(
         _("withheld by instance admin?"), default=False

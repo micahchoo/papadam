@@ -40,7 +40,8 @@ class TestOnMediaCopied:
 
         copies = Annotation.objects.filter(media_reference_id=NEW)
         assert copies.count() == 2
-        assert set(copies.values_list("annotation_text", flat=True)) == {"first", "second"}
+        texts = set(copies.values_list("annotation_text", flat=True))
+        assert texts == {"first", "second"}
 
     def test_deleted_annotations_are_also_copied(self) -> None:
         """Handler preserves original behaviour: is_delete state is carried over."""
@@ -48,7 +49,8 @@ class TestOnMediaCopied:
             media_reference_id=OLD, media_target="0,5", annotation_text="live"
         )
         Annotation.objects.create(
-            media_reference_id=OLD, media_target="5,10", annotation_text="dead", is_delete=True
+            media_reference_id=OLD, media_target="5,10",
+            annotation_text="dead", is_delete=True
         )
 
         media_copied.send(sender=None, old_uuid=OLD, new_uuid=NEW)

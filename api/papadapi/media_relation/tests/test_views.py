@@ -53,6 +53,52 @@ def test_create_reply(auth_client, annotation):
     assert annotation.replies.count() == 1
 
 
+@pytest.mark.django_db
+def test_create_reply_404_for_unknown_parent(auth_client):
+    import uuid
+    resp = auth_client.post(
+        f"/api/v1/media-relation/replies/{uuid.uuid4()}/",
+        data={"annotation_text": "orphan"},
+        format="json",
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_create_reply_defaults_to_text_type(auth_client, annotation):
+    resp = auth_client.post(
+        f"/api/v1/media-relation/replies/{annotation.uuid}/",
+        data={"annotation_text": "default type reply"},
+        format="json",
+    )
+    assert resp.status_code == 201
+    assert resp.data["annotation_type"] == "text"
+
+
+@pytest.mark.django_db
+def test_create_reply_inherits_media_reference_id(auth_client, annotation):
+    resp = auth_client.post(
+        f"/api/v1/media-relation/replies/{annotation.uuid}/",
+        data={"annotation_text": "inherits parent media"},
+        format="json",
+    )
+    assert resp.status_code == 201
+    assert resp.data["media_reference_id"] == annotation.media_reference_id
+
+
+@pytest.mark.django_db
+def test_create_reply_sets_created_by(auth_client, user, annotation):
+    resp = auth_client.post(
+        f"/api/v1/media-relation/replies/{annotation.uuid}/",
+        data={"annotation_text": "authored reply"},
+        format="json",
+    )
+    assert resp.status_code == 201
+    from papadapi.annotate.models import Annotation
+    reply = Annotation.objects.get(uuid=resp.data["uuid"])
+    assert reply.created_by == user
+
+
 # ── Media refs ────────────────────────────────────────────────────────────────
 
 

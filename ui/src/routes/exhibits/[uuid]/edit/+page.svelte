@@ -4,9 +4,9 @@
 	import { goto } from '$app/navigation';
 	import { exhibits } from '$lib/api';
 	import type { ExhibitBlock, ExhibitBlockType } from '$lib/api';
-	import { isAuthenticated } from '$lib/stores';
+	import { isAuthenticated, exhibitEnabled } from '$lib/stores';
 
-	const exhibitUuid = $derived($page.params.uuid ?? '');
+	const exhibitUuid = $derived($page.params['uuid'] ?? '');
 
 	// Exhibit metadata
 	let editTitle = $state('');
@@ -33,6 +33,10 @@
 	let error = $state('');
 
 	onMount(async () => {
+		if (!$exhibitEnabled) {
+			await goto('/');
+			return;
+		}
 		if (!$isAuthenticated) {
 			await goto('/auth/login');
 			return;

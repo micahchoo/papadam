@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DOMPurify from 'dompurify';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { groups, archive } from '$lib/api';
@@ -41,7 +42,7 @@
 		{:else if $selectedGroup}
 			<div>
 				<h1 class="text-xl font-bold">{$selectedGroup.name}</h1>
-				<p class="mt-2 text-gray-600">{@html $selectedGroup.description}</p>
+				<p class="mt-2 text-gray-600">{@html DOMPurify.sanitize($selectedGroup.description)}</p>
 				<div class="mt-6">
 					<button
 						class="w-full rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"

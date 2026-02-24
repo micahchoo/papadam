@@ -447,3 +447,25 @@ class HealthCheck(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         return Response(status=200)
+
+
+class RuntimeConfigView(generics.GenericAPIView):
+    """Serve runtime config to the SvelteKit SPA.
+
+    The browser fetches /config.json on startup to discover the API and CRDT
+    WebSocket URLs. Values come from PUBLIC_API_URL and PUBLIC_CRDT_URL env vars
+    (set in service_config.env). Returns empty strings if not configured so the
+    SPA can fall back gracefully in local dev.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        from django.conf import settings
+
+        return Response(
+            {
+                "API_URL": getattr(settings, "PUBLIC_API_URL", ""),
+                "CRDT_URL": getattr(settings, "PUBLIC_CRDT_URL", ""),
+            }
+        )

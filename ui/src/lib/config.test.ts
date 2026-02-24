@@ -16,13 +16,10 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
-describe('DEFAULT_UICONFIG', () => {
-	it('has standard profile and expected defaults', async () => {
-		const { DEFAULT_UICONFIG } = await import('$lib/config');
-		expect(DEFAULT_UICONFIG.profile).toBe('standard');
-		expect(DEFAULT_UICONFIG.logoUrl).toBeNull();
-		expect(DEFAULT_UICONFIG.primaryColor).toBe('#1e3a5f');
-		expect(DEFAULT_UICONFIG.welcomeText).toBe('Welcome');
+describe('getUIConfig', () => {
+	it('returns null before loadUIConfig is called', async () => {
+		const { getUIConfig } = await import('$lib/config');
+		expect(getUIConfig()).toBeNull();
 	});
 });
 

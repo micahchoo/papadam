@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DOMPurify from 'dompurify';
 	import { annotations as annoApi, mediaRelation } from '$lib/api';
 	import type { Annotation } from '$lib/api';
 
@@ -6,12 +7,14 @@
 		annotations?: Annotation[];
 		onPlaySnippet?: (start: number, end: number) => void;
 		formatTime?: (s: number) => string;
+		onAnnotationDeleted?: (id: number) => void;
 	}
 
 	const {
 		annotations = [],
 		onPlaySnippet = () => undefined,
-		formatTime = defaultFormatTime
+		formatTime = defaultFormatTime,
+		onAnnotationDeleted
 	}: Props = $props();
 
 	function defaultFormatTime(seconds: number): string {
@@ -104,7 +107,7 @@
 	async function deleteAnno(annotation: Annotation) {
 		try {
 			await annoApi.delete(annotation.uuid);
-			window.history.back();
+			onAnnotationDeleted?.(annotation.id);
 		} catch (err) {
 			console.error('Error deleting annotation:', err);
 		}
@@ -139,8 +142,30 @@
 						<p><strong>Timestamp:</strong> Invalid timestamp</p>
 					{/if}
 
+					<!-- Media-type body -->
+					{#if annotation.annotation_type === 'image' && annotation.annotation_image}
+						<img
+							src={annotation.annotation_image}
+							alt="Annotation"
+							class="mt-2 max-w-full rounded border border-gray-200"
+						/>
+					{:else if annotation.annotation_type === 'audio' && annotation.annotation_audio}
+						<audio src={annotation.annotation_audio} controls class="mt-2 w-full">
+							Your browser does not support audio playback.
+						</audio>
+					{:else if annotation.annotation_type === 'video' && annotation.annotation_video}
+						<video src={annotation.annotation_video} controls class="mt-2 w-full bg-black">
+							<track kind="captions" src="" label="Captions" />
+							Your browser does not support video playback.
+						</video>
+					{:else if annotation.annotation_type === 'media_ref' && annotation.media_ref_uuid}
+						<p class="mt-2 text-sm text-gray-500">
+							Linked media: <code class="font-mono text-xs">{annotation.media_ref_uuid}</code>
+						</p>
+					{/if}
+
 					<div class="mt-4 text-gray-600">
-						{@html annotation.annotation_text || 'No note available'}
+						{@html DOMPurify.sanitize(annotation.annotation_text || 'No note available')}
 					</div>
 
 					<div class="mt-2 flex gap-3">
@@ -164,7 +189,7 @@
 							{#each allRepliesFor(annotation.id) as reply}
 								<li class="rounded bg-gray-50 p-3 text-sm">
 									<div class="text-gray-700">
-										{@html reply.annotation_text || ''}
+										{@html DOMPurify.sanitize(reply.annotation_text || '')}
 									</div>
 									<span class="text-xs text-gray-400">{reply.created_at}</span>
 								</li>

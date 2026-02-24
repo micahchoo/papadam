@@ -1,16 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import DOMPurify from 'dompurify';
 	import { exhibits, archive, annotations as annoApi } from '$lib/api';
 	import type { ExhibitBlock, MediaStore, Annotation } from '$lib/api';
-	import { isAuthenticated } from '$lib/stores';
+	import { isAuthenticated, exhibitEnabled } from '$lib/stores';
+
+	function sanitize(html: string): string {
+		return DOMPurify.sanitize(html);
+	}
 
 	type BlockResult =
 		| { kind: 'media'; blockId: number; data: MediaStore }
 		| { kind: 'annotation'; blockId: number; data: Annotation }
 		| null;
 
-	const exhibitUuid = $derived($page.params.uuid ?? '');
+	const exhibitUuid = $derived($page.params['uuid'] ?? '');
 
 	let title = $state('');
 	let description = $state('');
@@ -22,6 +28,10 @@
 	let error = $state('');
 
 	onMount(async () => {
+		if (!$exhibitEnabled) {
+			await goto('/');
+			return;
+		}
 		try {
 			const { data: ex } = await exhibits.get(exhibitUuid);
 			title = ex.title;
@@ -117,7 +127,8 @@
 							{@const anno = annoData[block.id]}
 							{#if anno}
 								<div class="prose prose-sm max-w-none text-gray-700">
-									{@html anno.annotation_text || '(no text)'}
+									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+									{@html sanitize(anno.annotation_text || '(no text)')}
 								</div>
 							{:else}
 								<p class="text-sm text-gray-400">
