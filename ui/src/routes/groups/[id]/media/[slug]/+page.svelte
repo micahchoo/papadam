@@ -5,6 +5,7 @@
 	import DOMPurify from 'dompurify';
 	import { archive, annotations as annoApi } from '$lib/api';
 	import type { MediaStore, Annotation } from '$lib/api';
+	import { showTranscript } from '$lib/stores';
 	import AnnotationViewer from '$lib/components/AnnotationViewer.svelte';
 	import MediaPlayer from '$lib/components/MediaPlayer.svelte';
 	import type { ImageAnnotation } from '$lib/components/MediaPlayer.svelte';
@@ -27,6 +28,8 @@
 	let mediaDescription = $state('');
 
 	let mediaPlayerRef = $state<{ playSnippet: (start: number, end: number) => void } | null>(null);
+	let transcriptText = $state<string | null>(null);
+	let loadingTranscript = $state(false);
 
 	/** Image annotations whose annotation_image is set — passed to MediaPlayer for overlay. */
 	const imageAnnotations = $derived(
@@ -66,6 +69,31 @@
 
 	function handlePlaySnippet(start: number, end: number) {
 		mediaPlayerRef?.playSnippet(start, end);
+	}
+
+	/** Strip VTT metadata lines; return joined cue text. */
+	function parseVtt(raw: string): string {
+		return raw
+			.split('\n')
+			.filter(
+				(l) => l && !l.startsWith('WEBVTT') && !/^\d+$/.test(l) && !l.includes(' --> ')
+			)
+			.join(' ')
+			.replace(/\s+/g, ' ')
+			.trim();
+	}
+
+	async function loadTranscript(url: string) {
+		loadingTranscript = true;
+		try {
+			const resp = await fetch(url);
+			if (!resp.ok) throw new Error(`${resp.status}`);
+			transcriptText = parseVtt(await resp.text());
+		} catch {
+			transcriptText = '';
+		} finally {
+			loadingTranscript = false;
+		}
 	}
 
 	function handleAnnotationDeleted(id: number) {
@@ -137,7 +165,31 @@
 				src={recording.upload ?? ''}
 				controls={true}
 				{imageAnnotations}
+				transcriptUrl={recording.transcript_vtt_url}
 			/>
+			{#if $showTranscript && recording.transcript_vtt_url}
+				<div class="mt-3">
+					{#if transcriptText === null}
+						<button
+							class="text-sm text-blue-600 underline"
+							onclick={() => {
+							if (recording?.transcript_vtt_url) void loadTranscript(recording.transcript_vtt_url);
+						}}
+						>
+							Show transcript
+						</button>
+					{:else if loadingTranscript}
+						<p class="text-sm text-gray-500">Loading transcript…</p>
+					{:else if transcriptText}
+						<details open>
+							<summary class="cursor-pointer text-sm font-medium text-gray-700">Transcript</summary>
+							<p class="mt-2 text-sm leading-relaxed text-gray-600">{transcriptText}</p>
+						</details>
+					{:else}
+						<p class="text-sm text-gray-400">Transcript unavailable.</p>
+					{/if}
+				</div>
+			{/if}
 
 			<h1 class="mt-4 text-2xl font-bold">{recording.name}</h1>
 			<p class="text-sm text-gray-500">

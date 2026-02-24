@@ -13,6 +13,7 @@ import json
 import os
 import tarfile
 import uuid
+from typing import Any
 
 import requests
 import structlog
@@ -164,7 +165,7 @@ def _export_sync(request_id: int) -> bool:
                 "group_description": group.description,
             }
             if requested_by in group.users.all() or group.is_public:
-                media_data = {}
+                media_data: dict[str, Any] = {}
                 for data in MediaStore.objects.filter(group=group):
                     data_id = str(data.uuid)
                     media_data[data_id] = {}

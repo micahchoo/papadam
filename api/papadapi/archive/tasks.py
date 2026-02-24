@@ -7,14 +7,13 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
-from urllib.parse import urlparse
 
 import structlog
 from django.conf import settings
-from minio import Minio
 from minio.error import S3Error
 
 from papadapi.archive.models import MediaStore
+from papadapi.common.storage import extract_minio_domain, minio_client
 
 log = structlog.get_logger(__name__)
 
@@ -26,23 +25,6 @@ async def _set_status(media: MediaStore, status: str) -> None:
     """Async helper: update media_processing_status and persist."""
     media.media_processing_status = status
     await media.asave(update_fields=["media_processing_status"])
-
-
-def _minio_client(endpoint: str, access_key: str, secret_key: str) -> Minio:
-    return Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=False)
-
-
-def _extract_domain(url: str) -> str:
-    """Strip bucket prefix from MinIO endpoint URL."""
-    if not url.startswith(("http://", "https://")):
-        url = "http://" + url
-    netloc = urlparse(url).netloc
-    if netloc.startswith("www."):
-        netloc = netloc[4:]
-    bucket = getattr(settings, "AWS_STORAGE_BUCKET_NAME", "")
-    if bucket and bucket in netloc:
-        return netloc.strip(f"{bucket}.")
-    return netloc
 
 
 # ── tasks ─────────────────────────────────────────────────────────────────────
@@ -159,8 +141,8 @@ async def upload_to_storage(ctx: dict, media_id: int, folder_path: str) -> None:
     m = await MediaStore.objects.aget(id=media_id)
     await _set_status(m, "Stream uploading")
 
-    client = _minio_client(
-        _extract_domain(settings.AWS_S3_ENDPOINT_URL),
+    client = minio_client(
+        extract_minio_domain(settings.AWS_S3_ENDPOINT_URL),
         settings.AWS_ACCESS_KEY_ID,
         settings.AWS_SECRET_ACCESS_KEY,
     )

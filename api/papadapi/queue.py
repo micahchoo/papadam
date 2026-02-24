@@ -8,9 +8,9 @@ without converting to async views.
 Usage:
     from papadapi.queue import enqueue, enqueue_after
 
-    enqueue("delete_annotate_post_schedule", annotation_id=ann.id)
-    enqueue_after("delete_media_post_schedule", media_id=m.id, delay=10)
-    enqueue_after("delete_media_post_schedule", media_id=m.id,
+    enqueue("delete_annotate_post_schedule", ann.id)
+    enqueue_after("delete_media_post_schedule", m.id, delay=10)
+    enqueue_after("delete_media_post_schedule", m.id,
                   delay=timedelta(days=group.delete_wait_for))
 """
 
@@ -34,20 +34,19 @@ async def _enqueue_async(
     function: str,
     *args: object,
     _defer_by: timedelta | None = None,
-    **kwargs: object,
 ) -> str:
     pool: ArqRedis = await create_pool(_redis_settings())
     try:
-        job = await pool.enqueue_job(function, *args, _defer_by=_defer_by, **kwargs)
+        job = await pool.enqueue_job(function, *args, _defer_by=_defer_by)
         return job.job_id if job else ""
     finally:
         await pool.aclose()
 
 
-def enqueue(function: str, *args: object, **kwargs: object) -> str:
+def enqueue(function: str, *args: object) -> str:
     """Enqueue an ARQ job immediately. Returns the job ID."""
     try:
-        return asyncio.run(_enqueue_async(function, *args, **kwargs))
+        return asyncio.run(_enqueue_async(function, *args))
     except Exception as exc:
         log.error("enqueue_failed", function=function, error=str(exc))
         raise
@@ -57,20 +56,18 @@ def enqueue_after(
     function: str,
     *args: object,
     delay: int | timedelta = 0,
-    **kwargs: object,
 ) -> str:
     """Enqueue an ARQ job with a delay. Returns the job ID.
 
     Args:
         function: ARQ function name (must be registered in WorkerSettings.functions).
-        *args: Positional arguments forwarded to the task.
+        *args: Positional arguments forwarded to the task function.
         delay: Seconds (int) or timedelta to defer execution.
-        **kwargs: Keyword arguments forwarded to the task.
     """
     defer_by = delay if isinstance(delay, timedelta) else timedelta(seconds=delay)
     try:
         return asyncio.run(
-            _enqueue_async(function, *args, _defer_by=defer_by, **kwargs)
+            _enqueue_async(function, *args, _defer_by=defer_by)
         )
     except Exception as exc:
         log.error(

@@ -25,6 +25,7 @@ from papadapi.archive.views import (
     MediaStoreCopySet,
     MediaStoreCreateSet,
     MediaStoreRemoveTag,
+    MediaStoreTranscriptView,
     MediaStoreUpdateSet,
 )
 from papadapi.common.uiconfig_views import UIConfigView
@@ -156,6 +157,11 @@ urlpatterns = [
     path("api/v1/exhibit/", include("papadapi.exhibit.urls")),
     path("api/v1/media-relation/", include("papadapi.media_relation.urls")),
     path("api/v1/uiconfig/", UIConfigView.as_view(), name="uiconfig"),
+    path(
+        "api/v1/archive/<str:uuid>/transcript/",
+        MediaStoreTranscriptView.as_view(),
+        name="archive-transcript",
+    ),
 
     # ── Auth — djoser (user management) + simplejwt (tokens) ─────────────────
     re_path(r"^auth/", include("djoser.urls")),

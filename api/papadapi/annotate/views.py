@@ -1,9 +1,14 @@
 import contextlib
 from datetime import timedelta
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from papadapi.users.models import User
 
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from rest_framework import generics, mixins, status, viewsets
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from papadapi.annotate.permissions import (
@@ -87,7 +92,7 @@ class AnnotationCreateSet(
         else:
             return None
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
 
         # Mandatory fields
@@ -106,7 +111,8 @@ class AnnotationCreateSet(
             media_target=media_target,
             annotation_type=annotation_type,
             media_ref_uuid=media_ref_uuid_raw,
-            created_by=self.request.user,
+            # TYPE_DEBT: permission classes guarantee User not AnonymousUser
+            created_by=cast("User", self.request.user),
         )
 
         # File fields — assigned after create so upload_to functions run
@@ -168,7 +174,7 @@ class AnnotationRetreiveSet(
     def get_queryset(self):
         return Annotation.objects.filter(is_delete=False)
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
 
         obj = self.get_object()
@@ -187,10 +193,10 @@ class AnnotationRetreiveSet(
             for tag in m.tags.all():
                 m.tags.remove(tag)
                 recalculate_tag_count(tag)
-            for tag in data["tags"].split(","):
-                tag = tag.strip()
-                if tag:
-                    m.tags.add(create_or_update_tag(tag))
+            for tag_name in data["tags"].split(","):
+                tag_name = tag_name.strip()
+                if tag_name:
+                    m.tags.add(create_or_update_tag(tag_name))
 
         image_file = request.FILES.get("annotation_image")
         audio_file = request.FILES.get("annotation_audio")
@@ -206,7 +212,7 @@ class AnnotationRetreiveSet(
         serializer = AnnotationSerializer(m)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def destroy(self, request, *args, **kwargs):
+    def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)

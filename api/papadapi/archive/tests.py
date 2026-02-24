@@ -162,8 +162,8 @@ async def test_upload_to_storage_sets_completed_on_success(media):
             new=AsyncMock(return_value=mock_media),
         ),
         patch("asyncio.to_thread", new=AsyncMock(return_value=False)),
-        patch("papadapi.archive.tasks._minio_client"),
-        patch("papadapi.archive.tasks._extract_domain", return_value="minio:9000"),
+        patch("papadapi.archive.tasks.minio_client"),
+        patch("papadapi.archive.tasks.extract_minio_domain", return_value="minio:9000"),
         patch("django.conf.settings") as mock_settings,
     ):
         mock_settings.AWS_S3_ENDPOINT_URL = "http://minio:9000"
@@ -188,8 +188,8 @@ async def test_upload_to_storage_sets_error_on_failure(media):
             new=AsyncMock(return_value=mock_media),
         ),
         patch("asyncio.to_thread", new=AsyncMock(return_value=True)),  # True = errors
-        patch("papadapi.archive.tasks._minio_client"),
-        patch("papadapi.archive.tasks._extract_domain", return_value="minio:9000"),
+        patch("papadapi.archive.tasks.minio_client"),
+        patch("papadapi.archive.tasks.extract_minio_domain", return_value="minio:9000"),
         patch("django.conf.settings") as mock_settings,
     ):
         mock_settings.AWS_S3_ENDPOINT_URL = "http://minio:9000"
@@ -199,3 +199,83 @@ async def test_upload_to_storage_sets_error_on_failure(media):
         await upload_to_storage({}, media.id, "/tmp/stream/")
 
     assert mock_media.media_processing_status == "Stream upload error"
+
+
+# ── MediaStoreTranscriptView ──────────────────────────────────────────────────
+
+
+_VTT = b"WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello world\n"
+
+
+@pytest.mark.django_db
+def test_transcript_upload_succeeds(api_client, media, settings):
+    """Valid VTT with correct key → 200 and transcript_vtt_url set on model."""
+    settings.INTERNAL_SERVICE_KEY = "test-secret-key"
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    vtt = SimpleUploadedFile("transcript.vtt", _VTT, content_type="text/vtt")
+    resp = api_client.post(
+        f"/api/v1/archive/{media.uuid}/transcript/",
+        {"vtt": vtt},
+        HTTP_X_INTERNAL_KEY="test-secret-key",
+    )
+    assert resp.status_code == 200
+    assert "transcript_vtt_url" in resp.json()
+    media.refresh_from_db()
+    assert media.transcript_vtt_url
+
+
+@pytest.mark.django_db
+def test_transcript_upload_wrong_key_returns_403(api_client, media, settings):
+    """Wrong internal key → 403."""
+    settings.INTERNAL_SERVICE_KEY = "correct-key"
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    vtt = SimpleUploadedFile("t.vtt", _VTT, content_type="text/vtt")
+    resp = api_client.post(
+        f"/api/v1/archive/{media.uuid}/transcript/",
+        {"vtt": vtt},
+        HTTP_X_INTERNAL_KEY="wrong-key",
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_transcript_upload_missing_key_returns_403(api_client, media, settings):
+    """No key header at all → 403."""
+    settings.INTERNAL_SERVICE_KEY = "some-key"
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    vtt = SimpleUploadedFile("t.vtt", _VTT, content_type="text/vtt")
+    resp = api_client.post(
+        f"/api/v1/archive/{media.uuid}/transcript/",
+        {"vtt": vtt},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_transcript_upload_missing_file_returns_400(api_client, media, settings):
+    """Correct key but no vtt file → 400."""
+    settings.INTERNAL_SERVICE_KEY = "test-key"
+    resp = api_client.post(
+        f"/api/v1/archive/{media.uuid}/transcript/",
+        {},
+        HTTP_X_INTERNAL_KEY="test-key",
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_transcript_upload_unknown_uuid_returns_404(api_client, settings):
+    """Correct key but UUID doesn't exist → 404."""
+    settings.INTERNAL_SERVICE_KEY = "test-key"
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    vtt = SimpleUploadedFile("t.vtt", _VTT, content_type="text/vtt")
+    resp = api_client.post(
+        "/api/v1/archive/00000000-0000-0000-0000-000000000000/transcript/",
+        {"vtt": vtt},
+        HTTP_X_INTERNAL_KEY="test-key",
+    )
+    assert resp.status_code == 404

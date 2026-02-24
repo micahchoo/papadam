@@ -28,6 +28,7 @@ class MediaStoreSerializer(serializers.ModelSerializer):
             "file_extension",
             "media_processing_status",
             "is_public",
+            "transcript_vtt_url",
         )
         read_only_fields = (
             "uuid",

@@ -103,6 +103,12 @@ class MediaStore(models.Model):
         default="Yet to process",
         choices=media_processing_choices,
     )
+    transcript_vtt_url = models.URLField(
+        _("Transcript VTT URL"),
+        max_length=500,
+        blank=True,
+        default="",
+    )
 
     class Meta:
         verbose_name = _("MediaStore")

@@ -102,3 +102,9 @@ export const timeRangeInputMode = derived(
 	uiConfig,
 	($c): TimeRangeInput => $c?.annotations_config.time_range_input ?? 'slider'
 );
+
+/** Whether to show the transcript text panel; default false (Phase 5 if needed). */
+export const showTranscript = derived(
+	uiConfig,
+	($c): boolean => $c?.player_controls.show_transcript ?? false
+);

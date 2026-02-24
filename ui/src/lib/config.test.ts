@@ -7,6 +7,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Prevent api.ts from firing its module-level resolveBaseUrl() call (which calls fetch)
+// when config.ts is re-imported after vi.resetModules().  config.ts only uses uiconfig.get()
+// in loadUIConfig(), which is not under test here.
+vi.mock('$lib/api', () => ({
+	uiconfig: { get: vi.fn().mockResolvedValue({ data: null }) }
+}));
+
 beforeEach(() => {
 	vi.resetModules();
 	// Clear VITE_API_URL/VITE_CRDT_URL so .env.local values don't short-circuit config.ts.

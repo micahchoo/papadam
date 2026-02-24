@@ -244,6 +244,12 @@ class Common(Configuration):
 
     # ── Storage ───────────────────────────────────────────────────────────────
 
+    # ── Internal service key — shared by transcribe worker ───────────────────
+
+    INTERNAL_SERVICE_KEY = env.str("INTERNAL_SERVICE_KEY", "")
+
+    # ── Storage ───────────────────────────────────────────────────────────────
+
     STORAGES = {
         "default": {"BACKEND": "storages.backends.s3.S3Storage"},
         "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},

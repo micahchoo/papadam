@@ -510,6 +510,60 @@ Local dev: set `VITE_API_URL` + `VITE_CRDT_URL` in `ui/.env.local` instead.
 
 ---
 
+## Delta from Original Vision
+
+### Divergence from upstream papad (Janastu/Servelots)
+
+The upstream project is a Django 2.x + Vue 2 SPA for W3C-style community annotation over shared media archives.
+papadam preserves the data model (Archive, Annotation, Group, Tags, ImportExport), W3C annotation structure,
+ffmpeg HLS pipeline, MinIO/S3 layer, and group permission system exactly — then diverges on every other axis.
+
+| Dimension | upstream papad | papadam |
+|---|---|---|
+| Annotation types | text only | text, image, audio, video, media_ref |
+| Collaborative editing | none | Y.js CRDT + y-websocket + IndexedDB offline |
+| Threaded replies | none | `reply_to` FK + media-to-media (`media_relation` app) |
+| Exhibits | none | Exhibit builder — curated public presentations |
+| UI customisation | per-deployment builds | UIConfig per-group — one codebase, no custom builds |
+| Transcription | none | Whisper worker (optional Docker profile, VTT captions) |
+| Architecture enforcement | none | import-linter (backend) + eslint-boundaries (frontend) |
+| Test coverage gate | no gate | 80% pytest + 80% Vitest, enforced in CI |
+| Frontend framework | Vue 2 | SvelteKit 2 + Svelte 5, adapter-static PWA |
+| Media player | video.js | HLS.js adaptive bitrate |
+| Infrastructure | single compose | multi-profile (transcribe, backup, webserver, docs, minio) |
+
+The REST API is backwards-compatible where endpoints overlap.
+The tooling replacements (Huey→ARQ, Djoser→simplejwt, black/isort/flake8→ruff, etc.)
+are detailed in the Backend Constraints section above.
+
+### Planned vs shipped
+
+| Feature | Plan | Status | Notes |
+|---|---|---|---|
+| ARQ + Redis | Phase 1 | ✓ | |
+| JWT (drf-simplejwt) | Phase 1 | ✓ | |
+| import-linter 10 contracts | Phase 1 | ✓ | |
+| PostgreSQL-only | Phase 1 | ✓ | |
+| Y.js CRDT annotations | Phase 2 | ✓ | |
+| HLS.js adaptive player | Phase 2 | ✓ | |
+| Exhibit builder | Phase 2 | ✓ (deepened Phase 4) | Archive picker multi-filter deferred → Phase 5 |
+| UIConfig per-group | Phase 2 | ✓ (landed Phase 4) | More complex than estimated — slipped one phase |
+| Image overlay annotations | Phase 3 | ✓ | |
+| Audio/video reply transcode | Phase 3 | ✓ | Full ARQ pipeline |
+| Whisper transcription | Phase 3 | ✓ (landed Phase 4) | Optional worker; VTT wired in player |
+| Service worker offline queue | Phase 3 | ☐ | Deferred; y-indexeddb covers basic offline |
+| WCAG AA audit | Phase 3 | partial | high-contrast CSS profile + modal fixes shipped; full audit pending |
+| icon / voice profiles | Phase 4 | partial | CSS vars + UIConfig wired; full rendering → Phase 5 |
+| Block drag/keyboard reorder | Phase 4 | ☐ | Phase 5 |
+| ActivityPub federation | Phase 5 | ☐ | As planned |
+| Decentralised identity (DID) | Phase 5 | ☐ | As planned |
+
+One addition beyond the original plan: **server-authoritative moderation flags**
+(`is_instance_admin_withheld`, `is_instance_group_withheld`) — required once CRDT was in scope,
+because CRDT semantics must not control moderation state.
+
+---
+
 ## Roadmap
 
 ### Phase 1 — Foundation (backend hardening) ✓ COMPLETE

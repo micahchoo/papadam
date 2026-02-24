@@ -7,44 +7,25 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
-from urllib.parse import urlparse
 
 import structlog
 from django.conf import settings
-from minio import Minio
 from minio.error import S3Error
 
 from papadapi.annotate.models import Annotation
+from papadapi.common.storage import (
+    delete_minio_object,
+    extract_minio_domain,
+    minio_client,
+)
 
 log = structlog.get_logger(__name__)
 
 
-# ── MinIO helpers
-# Duplicated from archive/tasks.py — two consumers does not justify extraction.
-# TODO(loop): extract to archive/_hls.py or common/hls.py when a third consumer appears.
-
-
-def _minio_client(endpoint: str, access_key: str, secret_key: str) -> Minio:
-    return Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=False)
-
-
-def _extract_domain(url: str) -> str:
-    """Strip bucket prefix from MinIO endpoint URL to get the bare host."""
-    if not url.startswith(("http://", "https://")):
-        url = "http://" + url
-    netloc = urlparse(url).netloc
-    if netloc.startswith("www."):
-        netloc = netloc[4:]
-    bucket = getattr(settings, "AWS_STORAGE_BUCKET_NAME", "")
-    if bucket and bucket in netloc:
-        return netloc.strip(f"{bucket}.")
-    return netloc
-
-
 async def _upload_hls_folder(folder: str, remote_prefix: str) -> None:
     """Upload every file produced by ffmpeg HLS output to MinIO, then remove locally."""
-    client = _minio_client(
-        _extract_domain(settings.AWS_S3_ENDPOINT_URL),
+    client = minio_client(
+        extract_minio_domain(settings.AWS_S3_ENDPOINT_URL),
         settings.AWS_ACCESS_KEY_ID,
         settings.AWS_SECRET_ACCESS_KEY,
     )
@@ -130,10 +111,10 @@ async def transcode_annotation_audio(ctx: dict, annotation_id: int) -> None:
     remote_prefix = f"annotate/audio/{annotation_id}/"
     await _upload_hls_folder(folder, remote_prefix)
 
-    # Raw file remains in MinIO as orphan — scheduling deletion is deferred.
-    # TODO(loop): enqueue raw file deletion after HLS upload succeeds.
+    raw_key = annotation.annotation_audio.name
     annotation.annotation_audio.name = f"{remote_prefix}{manifest_name}"
     await annotation.asave(update_fields=["annotation_audio"])
+    await asyncio.to_thread(delete_minio_object, raw_key)
     log.info("transcode_annotation_audio_done", annotation_id=annotation_id)
 
 
@@ -188,7 +169,8 @@ async def transcode_annotation_video(ctx: dict, annotation_id: int) -> None:
     remote_prefix = f"annotate/video/{annotation_id}/"
     await _upload_hls_folder(folder, remote_prefix)
 
-    # TODO(loop): enqueue raw file deletion after HLS upload succeeds.
+    raw_key = annotation.annotation_video.name
     annotation.annotation_video.name = f"{remote_prefix}{manifest_name}"
     await annotation.asave(update_fields=["annotation_video"])
+    await asyncio.to_thread(delete_minio_object, raw_key)
     log.info("transcode_annotation_video_done", annotation_id=annotation_id)

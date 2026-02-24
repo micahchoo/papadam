@@ -5,7 +5,7 @@ from rest_framework import serializers
 from papadapi.crdt.models import YDocState
 
 
-class Base64BinaryField(serializers.Field[str, bytes]):
+class Base64BinaryField(serializers.Field[str, bytes]):  # type: ignore[type-arg]  # TYPE_DEBT: djangorestframework-stubs Field expects 4 generic params; stubs version mismatch
     """Encode BinaryField bytes as base64 for JSON transport."""
 
     def to_representation(self, value: bytes | memoryview) -> str:

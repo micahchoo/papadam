@@ -16,9 +16,17 @@
 		controls?: boolean;
 		/** Image annotations to overlay during playback (type='image', annotation_image set). */
 		imageAnnotations?: ImageAnnotation[];
+		/** WebVTT caption URL from the transcript worker. Empty string = no captions. */
+		transcriptUrl?: string;
 	}
 
-	const { src = '', autoplay = false, controls = true, imageAnnotations = [] }: Props = $props();
+	const {
+		src = '',
+		autoplay = false,
+		controls = true,
+		imageAnnotations = [],
+		transcriptUrl = ''
+	}: Props = $props();
 
 	let videoEl = $state<HTMLVideoElement | null>(null);
 	let audioEl = $state<HTMLAudioElement | null>(null);
@@ -126,7 +134,7 @@
 					onloadedmetadata={onLoadedMetadata}
 					ontimeupdate={onTimeUpdate}
 				>
-					<track kind="captions" src="" label="Captions" />
+					<track kind="captions" src={transcriptUrl} label="Captions" default={!!transcriptUrl} />
 					Your browser does not support the video element.
 				</video>
 			{/if}

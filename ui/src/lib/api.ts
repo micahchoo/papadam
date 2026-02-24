@@ -82,6 +82,8 @@ export interface MediaStore {
 	updated_at: string;
 	/** Nested User object — MediaStoreSerializer uses UserSerializer */
 	created_by: User | null;
+	/** WebVTT caption URL — set by transcribe worker after Whisper finishes, empty string if not yet transcribed. */
+	transcript_vtt_url: string;
 }
 
 export type AnnotationType = 'text' | 'image' | 'audio' | 'video' | 'media_ref';
@@ -208,15 +210,20 @@ async function resolveBaseUrl(): Promise<string> {
 let baseURL = '';
 const http = axios.create({ baseURL });
 
-// Propagate the resolved URL into the already-created axios instance.
-// Must come after `http` is declared so the closure captures the binding.
-void resolveBaseUrl().then((url) => {
-	baseURL = url;
-	http.defaults.baseURL = url;
-});
+// Lazy URL resolution — fires on the first request, not at module init.
+// This prevents an extra fetch() when the module is re-imported in tests.
+let _urlReady: Promise<void> | null = null;
+function ensureBaseUrl(): Promise<void> {
+	_urlReady ??= resolveBaseUrl().then((url) => {
+		baseURL = url;
+		http.defaults.baseURL = url;
+	});
+	return _urlReady;
+}
 
-// Attach access token from localStorage on every request
-http.interceptors.request.use((config) => {
+// Attach access token and resolve base URL on every request
+http.interceptors.request.use(async (config) => {
+	await ensureBaseUrl();
 	const token = localStorage.getItem('access_token');
 	if (token) config.headers.Authorization = `Bearer ${token}`;
 	return config;

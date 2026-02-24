@@ -45,6 +45,9 @@ STORAGES = {
 MEDIA_URL = "/media/"
 MEDIA_ROOT = "/tmp/papadam-test/"
 
+# Internal service key — set per-test via pytest settings fixture when testing transcript endpoint
+INTERNAL_SERVICE_KEY = ""
+
 # Needed by archive app at import time even when using InMemoryStorage
 AWS_STORAGE_BUCKET_NAME = "test-bucket"
 AWS_ACCESS_KEY_ID = "test"

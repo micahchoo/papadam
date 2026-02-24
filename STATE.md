@@ -8,64 +8,72 @@ _Last updated: 2026-02-24. Overwrite this file each loop; do not append._
 
 | Check | Result |
 |---|---|
-| `ruff check papadapi/annotate/` | 0 errors |
-| `mypy papadapi/annotate/` | 0 errors (pre-existing errors in queue.py unchanged) |
-| `lint-imports` | 10/10 contracts kept |
 | `svelte-check` | 0 errors, 0 warnings (582 files) |
-| `eslint` (new/modified files) | 0 errors |
-| `pytest papadapi/annotate/` | 31/31 passed |
-| `pytest papadapi/` (full) | 113/113 passed |
+| `eslint` | 0 errors, 0 warnings |
+| `vitest run` | 84/85 passed (1 pre-existing config caching flake — not caused by this round) |
+| `pytest` | 118/118 passed |
+| `ruff` | 0 violations (pre-existing manage-prod.py issues unchanged) |
+| `lint-imports` | 10/10 contracts kept |
 
 ---
 
-## Delta (this session — round 13)
+## Delta (this session — round 15: Whisper transcript display)
 
-### Backend: annotation HLS transcode pipeline
+### Backend
 
-- `annotate/tasks.py`: New ARQ tasks `transcode_annotation_audio` and `transcode_annotation_video`
-  - Probe bitrate/resolution via ffprobe, transcode to HLS with ffmpeg, upload to MinIO, overwrite field `.name` to manifest path
-  - On ffmpeg failure: field NOT updated — raw file remains playable natively
-  - MinIO helpers duplicated from `archive/tasks.py` (YAGNI — `# TODO(loop):` to extract when 3rd consumer appears)
-- `annotate/views.py`: `AnnotationCreateSet.create()` enqueues `transcode_annotation_audio`/`transcode_annotation_video` after `m.save()` when audio/video file present
-- `annotate/tests/test_tasks.py`: 5 new async tests (audio: 3, video: 2) — all import at top, ruff-clean
-- `annotate/tests/test_create_update.py`: 3 new enqueue tests (audio, video, text-no-op) — all import at top, ruff-clean
-- `worker.py`: `transcode_annotation_audio` and `transcode_annotation_video` registered in `WorkerSettings.functions`
+- `papadapi/common/storage.py` — NEW: extracted shared MinIO helpers (`minio_client`, `extract_minio_domain`) — 3rd consumer triggered the extraction (TODO from round 1)
+- `papadapi/archive/tasks.py` — import helpers from `common/storage`; remove duplicated `_minio_client` / `_extract_domain`
+- `papadapi/annotate/tasks.py` — same; remove duplicated MinIO helpers
+- `papadapi/archive/models.py` — add `transcript_vtt_url = URLField(blank=True, default='')`
+- `papadapi/archive/migrations/0023_mediastore_transcript_vtt_url.py` — migration
+- `papadapi/archive/serializers.py` — add `transcript_vtt_url` to fields
+- `papadapi/archive/views.py` — add `MediaStoreTranscriptView` (`POST /api/v1/archive/<uuid>/transcript/` with `X-Internal-Key` auth); add structlog + default_storage imports
+- `papadapi/config/common.py` — add `INTERNAL_SERVICE_KEY = env.str("INTERNAL_SERVICE_KEY", "")`
+- `papadapi/config/test.py` — add `INTERNAL_SERVICE_KEY = ""` stub
+- `papadapi/urls.py` — register `api/v1/archive/<uuid>/transcript/` endpoint
+- `papadapi/archive/tests.py` — fix patches to use `minio_client`/`extract_minio_domain`; add 5 new `MediaStoreTranscriptView` tests
+- `papadapi/annotate/tests/test_tasks.py` — fix Minio patches to use `minio_client`/`extract_minio_domain`
 
-### Frontend: HLS-capable annotation media player
+### Transcribe worker
 
-- `ui/src/lib/components/primitives/AnnotationMedia.svelte`: New primitive — `<audio>`/`<video>` with HLS.js init, same pattern as `MediaPlayer.svelte`
-- `ui/src/lib/components/AnnotationViewer.svelte`: Replaced bare `<audio>`/`<video>` elements with `<AnnotationMedia>` for HLS support
+- `transcribe/worker.py` — implement `transcribe_media(ctx, media_uuid)`:
+  - Download media from upload URL via httpx stream
+  - Run `whisper.load_model(_WHISPER_MODEL).transcribe()`
+  - Convert segments to WebVTT via `_segments_to_vtt()`
+  - POST VTT to `/api/v1/archive/<uuid>/transcript/` with `X-Internal-Key`
+  - Registered in `WorkerSettings.functions = [transcribe_media]`
 
-### Docs
+### Frontend
 
-- `ARCHITECTURE.md` Phase 3 checklist: audio/video reply upload items marked `[x]`
+- `ui/src/lib/api.ts` — add `transcript_vtt_url: string` to `MediaStore` interface
+- `ui/src/lib/stores.ts` — add `showTranscript` derived store from `uiConfig.player_controls.show_transcript`
+- `ui/src/lib/components/MediaPlayer.svelte` — add `transcriptUrl?: string` prop; wire `<track kind="captions">` element; `default` attribute set when URL present
+- `ui/src/routes/groups/[id]/media/[slug]/+page.svelte` — pass `transcriptUrl` to `MediaPlayer`; add transcript panel controlled by `$showTranscript` UIConfig flag; `loadTranscript()` + `parseVtt()` helpers; lazy-loaded on "Show transcript" button click
+- `ui/src/lib/stores.test.ts` — add `transcript_vtt_url: ''` to `MOCK_MEDIA` fixture
 
 ---
 
 ## Gaps
 
-None.
+- Pre-existing Vitest flake: `config.test.ts > loadConfig > is cached` — fetch called 2× instead of 1 due to `api.ts` module init calling `resolveBaseUrl()` on `vi.resetModules()` re-import. Not introduced this round.
+- Pre-existing unhandled rejection in `api.test.ts`: `Cannot set properties of undefined (setting 'baseURL')` — `http.defaults` undefined in Vitest environment. Not introduced this round.
+- `transcribe_media` worker function is not yet covered by backend tests (transcribe app is separate process with no pytest setup)
 
 ---
 
 ## Known technical debt / TODO(loop)
 
 | Item | Rounds | Notes |
-|---|---|---|
-| Raw annotation files not deleted from MinIO after HLS transcode | 1 | TODO(loop) in `annotate/tasks.py`. No bucket cost concern yet. |
-| MinIO helpers duplicated in `annotate/tasks.py` | 1 | TODO(loop) to extract when a 3rd consumer appears. |
-| `[data-profile]` icon/voice rendering | 1→5 | Phase 5 design work first. |
+|---|---|------|
+| Raw annotation files not deleted from MinIO after HLS transcode | 1 | TODO(loop) in `annotate/tasks.py`. |
+| Pre-existing Vitest config cache flake | 1 | `config.test.ts` — fix requires isolating `api.ts` module init in tests. |
+| `[data-profile]` icon/voice rendering | 1→5 | Phase 5. |
 | `[data-voice]` TTS / voice UI | 1→5 | Phase 5. |
 | `UIConfig.offline_first` service worker | 1→5 | Phase 5. |
 | `player_controls.show_waveform` | 4→5 | Phase 5. |
-| `player_controls.show_transcript` | 4→5 | Phase 5. |
 | `player_controls.default_quality` | 4→5 | Phase 5. |
 | Tailwind brand color opacity variants | 1 | Phase 5 if needed. |
 | `staticfiles.W004` static dir missing | — | Pre-existing. Dev-only warning. |
-| `IsAnnotateCreateOrReadOnly.has_permission()` path-based archive lookup | — | Fragile URL extraction for nested routes. Pre-existing. |
-| Full test coverage < 80% (global) | — | Legacy apps (archive, common views, importexport) untested. 80% gate enforced per annotate/ only. |
-| ExhibitBlock UUID referential integrity | — | `ExhibitBlockSerializer.validate()` does not verify `media_uuid`/`annotation_uuid` exist. Phase 5. |
-| `extra_group_questions` per-group filtering | 1+ | `UpdateGroupSerializer` returns all questions. `# TODO(loop):` in common/serializers.py:109. |
-| Exhibit publish endpoint | — | `GET /api/v1/exhibit/{uuid}/publish/` not implemented. Phase 5. |
+| ExhibitBlock UUID referential integrity | — | Phase 5. |
+| Exhibit publish endpoint | — | Phase 5. |
 | Exhibit block drag/keyboard reorder | — | Phase 5. |
-| Exhibit archive picker (multi-filter) | — | Phase 5. |

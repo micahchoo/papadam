@@ -150,3 +150,70 @@ async def test_transcode_video_noop_when_no_file(annotation):
     with patch("papadapi.annotate.tasks.asyncio.create_subprocess_exec") as mock_exec:
         await transcode_annotation_video({}, annotation.id)
         mock_exec.assert_not_called()
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_transcode_audio_deletes_raw_file_after_hls(annotation):
+    """After successful audio transcode, the original raw file is deleted from MinIO."""
+    annotation.annotation_audio.name = "annotate/audio/raw.mp3"
+    await annotation.asave(update_fields=["annotation_audio"])
+
+    fake_proc = AsyncMock()
+    fake_proc.communicate = AsyncMock(return_value=(b"128000\n", b""))
+    fake_proc.wait = AsyncMock(return_value=0)
+
+    mock_minio = MagicMock()
+
+    with (
+        patch("papadapi.annotate.tasks.asyncio.create_subprocess_exec",
+              return_value=fake_proc),
+        patch("papadapi.annotate.tasks.minio_client", return_value=mock_minio),
+        patch("papadapi.annotate.tasks.extract_minio_domain",
+              return_value="minio:9000"),
+        patch("papadapi.common.storage.minio_client", return_value=mock_minio),
+        patch("papadapi.common.storage.extract_minio_domain",
+              return_value="minio:9000"),
+        patch("papadapi.annotate.tasks.os.makedirs"),
+        patch("papadapi.annotate.tasks.os.walk",
+              return_value=[("/tmp/x", [], ["stream.m3u8", "stream0.ts"])]),
+        patch("papadapi.annotate.tasks.os.remove"),
+    ):
+        await transcode_annotation_audio({}, annotation.id)
+
+    mock_minio.remove_object.assert_called_once()
+    call_args = mock_minio.remove_object.call_args
+    assert call_args[0][1] == "annotate/audio/raw.mp3"  # key matches original
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_transcode_video_deletes_raw_file_after_hls(annotation):
+    """After successful video transcode, the original raw file is deleted from MinIO."""
+    annotation.annotation_video.name = "annotate/video/raw.mp4"
+    await annotation.asave(update_fields=["annotation_video"])
+
+    fake_probe = AsyncMock()
+    fake_probe.communicate = AsyncMock(return_value=(b"1280x720\n", b""))
+    fake_ffmpeg = AsyncMock()
+    fake_ffmpeg.wait = AsyncMock(return_value=0)
+
+    mock_minio = MagicMock()
+
+    with (
+        patch("papadapi.annotate.tasks.asyncio.create_subprocess_exec",
+              side_effect=[fake_probe, fake_ffmpeg]),
+        patch("papadapi.annotate.tasks.minio_client", return_value=mock_minio),
+        patch("papadapi.annotate.tasks.extract_minio_domain",
+              return_value="minio:9000"),
+        patch("papadapi.common.storage.minio_client", return_value=mock_minio),
+        patch("papadapi.common.storage.extract_minio_domain",
+              return_value="minio:9000"),
+        patch("papadapi.annotate.tasks.os.makedirs"),
+        patch("papadapi.annotate.tasks.os.walk",
+              return_value=[("/tmp/x", [], ["stream.m3u8", "stream0.ts"])]),
+        patch("papadapi.annotate.tasks.os.remove"),
+    ):
+        await transcode_annotation_video({}, annotation.id)
+
+    mock_minio.remove_object.assert_called_once()
+    call_args = mock_minio.remove_object.call_args
+    assert call_args[0][1] == "annotate/video/raw.mp4"

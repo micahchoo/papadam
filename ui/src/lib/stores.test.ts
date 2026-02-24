@@ -57,7 +57,8 @@ const MOCK_MEDIA: MediaStore = {
 	media_processing_status: 'Yet to process',
 	created_at: '2024-01-01T00:00:00Z',
 	updated_at: '2024-01-01T00:00:00Z',
-	created_by: null
+	created_by: null,
+	transcript_vtt_url: ''
 };
 
 describe('auth stores', () => {
