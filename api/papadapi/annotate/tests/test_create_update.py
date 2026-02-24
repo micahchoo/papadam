@@ -5,7 +5,10 @@ Verifies that annotation_type, annotation_audio, annotation_video,
 media_ref_uuid, and reply_to are persisted correctly via the API.
 """
 
+from unittest.mock import patch
+
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from papadapi.annotate.models import Annotation
 
@@ -180,3 +183,69 @@ def test_update_partial_leaves_other_fields(member_client, member_annotation):
     member_annotation.refresh_from_db()
     assert member_annotation.annotation_type == Annotation.AnnotationType.IMAGE
     assert member_annotation.annotation_text == original_text
+
+
+# ── Transcode enqueue on create ────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_create_audio_annotation_enqueues_transcode(member_client, member_media):
+    """Posting an audio file triggers transcode_annotation_audio enqueue."""
+    audio_file = SimpleUploadedFile("clip.mp3", b"RIFF" + b"\x00" * 40,
+                                    content_type="audio/mpeg")
+    with patch("papadapi.annotate.views.enqueue") as mock_enqueue:
+        resp = member_client.post(
+            "/api/v1/annotate/",
+            {
+                "media_reference_id": str(member_media.uuid),
+                "annotation_text": "",
+                "media_target": "t=0,10",
+                "annotation_type": "audio",
+                "annotation_audio": audio_file,
+                "tags": "",
+            },
+            format="multipart",
+        )
+    assert resp.status_code == 200
+    created_id = Annotation.objects.get(uuid=resp.data["uuid"]).id
+    mock_enqueue.assert_called_once_with("transcode_annotation_audio", created_id)
+
+
+@pytest.mark.django_db
+def test_create_video_annotation_enqueues_transcode(member_client, member_media):
+    """Posting a video file triggers transcode_annotation_video enqueue."""
+    video_file = SimpleUploadedFile("clip.mp4", b"\x00" * 64, content_type="video/mp4")
+    with patch("papadapi.annotate.views.enqueue") as mock_enqueue:
+        resp = member_client.post(
+            "/api/v1/annotate/",
+            {
+                "media_reference_id": str(member_media.uuid),
+                "annotation_text": "",
+                "media_target": "t=0,10",
+                "annotation_type": "video",
+                "annotation_video": video_file,
+                "tags": "",
+            },
+            format="multipart",
+        )
+    assert resp.status_code == 200
+    created_id = Annotation.objects.get(uuid=resp.data["uuid"]).id
+    mock_enqueue.assert_called_once_with("transcode_annotation_video", created_id)
+
+
+@pytest.mark.django_db
+def test_create_text_annotation_does_not_enqueue(member_client, member_media):
+    """Text annotations (no media file) do not trigger any transcode enqueue."""
+    with patch("papadapi.annotate.views.enqueue") as mock_enqueue:
+        resp = member_client.post(
+            "/api/v1/annotate/",
+            {
+                "media_reference_id": str(member_media.uuid),
+                "annotation_text": "note",
+                "media_target": "t=0,5",
+                "tags": "",
+            },
+            format="multipart",
+        )
+    assert resp.status_code == 200
+    mock_enqueue.assert_not_called()

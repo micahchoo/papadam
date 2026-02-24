@@ -25,7 +25,11 @@ log = structlog.get_logger()
 
 # ── Task functions (imported after Django setup) ──────────────────────────────
 
-from papadapi.annotate.tasks import delete_annotate_post_schedule  # noqa: E402
+from papadapi.annotate.tasks import (  # noqa: E402
+    delete_annotate_post_schedule,
+    transcode_annotation_audio,
+    transcode_annotation_video,
+)
 from papadapi.archive.tasks import (  # noqa: E402
     convert_to_hls,
     convert_to_hls_audio,
@@ -50,6 +54,8 @@ class WorkerSettings:
     redis_settings_from_dsn = os.environ.get("REDIS_URL", "redis://redis:6379/0")
     functions = [
         delete_annotate_post_schedule,
+        transcode_annotation_audio,
+        transcode_annotation_video,
         delete_media_post_schedule,
         convert_to_hls,
         convert_to_hls_audio,

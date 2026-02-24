@@ -14,7 +14,7 @@ from papadapi.archive.models import MediaStore
 from papadapi.common.functions import create_or_update_tag, recalculate_tag_count
 from papadapi.common.models import Group, Tags
 from papadapi.common.serializers import CustomPageNumberPagination
-from papadapi.queue import enqueue_after
+from papadapi.queue import enqueue, enqueue_after
 from papadapi.users.permissions import IsSuperUser
 
 from .models import Annotation
@@ -125,6 +125,13 @@ class AnnotationCreateSet(
                 m.reply_to = Annotation.objects.get(id=int(reply_to_raw))
 
         m.save()
+
+        # Enqueue HLS transcoding for audio/video reply files — raw files remain
+        # playable natively if the worker hasn't processed them yet.
+        if audio_file:
+            enqueue("transcode_annotation_audio", m.id)
+        if video_file:
+            enqueue("transcode_annotation_video", m.id)
 
         for tag in data.get("tags", "").split(","):
             tag = tag.strip()
