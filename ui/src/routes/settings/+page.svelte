@@ -152,7 +152,13 @@
 		</p>
 	{/if}
 
-	<form onsubmit={(e) => { e.preventDefault(); void save(); }} class="space-y-5">
+	<form
+		onsubmit={(e) => {
+			e.preventDefault();
+			void save();
+		}}
+		class="space-y-5"
+	>
 		<!-- Branding -->
 		<fieldset class="rounded border border-gray-200 p-4">
 			<legend class="px-1 text-sm font-semibold text-gray-600">Branding</legend>

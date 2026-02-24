@@ -29,12 +29,16 @@
 	let audioFile = $state<File | null>(null);
 	let videoFile = $state<File | null>(null);
 	let mediaRefUuid = $state('');
+	let submitting = $state(false);
+	let submitError = $state<string | null>(null);
 
 	const duration = $derived($selectedMediaDuration ?? 100);
 	const startPct = $derived((newAnnotation.start / duration) * 100);
 	const endPct = $derived((newAnnotation.end / duration) * 100);
 
 	async function submitAnnotation() {
+		submitting = true;
+		submitError = null;
 		try {
 			const formData = new FormData();
 			formData.append('media_reference_id', recording.uuid);
@@ -62,10 +66,11 @@
 			audioFile = null;
 			videoFile = null;
 			mediaRefUuid = '';
-		} catch (err) {
-			console.error('Failed to create annotation:', err);
-		} finally {
 			showAnnotationModal = false;
+		} catch {
+			submitError = 'Failed to create annotation. Please try again.';
+		} finally {
+			submitting = false;
 		}
 	}
 
@@ -261,7 +266,9 @@
 			</div>
 		{:else if annotationType === 'media_ref'}
 			<div class="mb-4">
-				<label class="mb-2 block text-sm font-medium" for="anno-media-ref">Referenced media UUID</label>
+				<label class="mb-2 block text-sm font-medium" for="anno-media-ref"
+					>Referenced media UUID</label
+				>
 				<input
 					id="anno-media-ref"
 					type="text"
@@ -292,13 +299,20 @@
 			/>
 		</div>
 		<div class="flex justify-end space-x-2">
+			{#if submitError}
+				<p class="mb-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+					{submitError}
+				</p>
+			{/if}
 			<button
-				class="rounded bg-gray-300 px-4 py-2 text-black hover:bg-gray-400"
+				class="rounded bg-gray-300 px-4 py-2 text-black hover:bg-gray-400 disabled:opacity-50"
+				disabled={submitting}
 				onclick={() => (showAnnotationModal = false)}>Cancel</button
 			>
 			<button
-				class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-				onclick={() => void submitAnnotation()}>Create Annotation</button
+				class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+				disabled={submitting}
+				onclick={() => void submitAnnotation()}>{submitting ? 'Saving…' : 'Create Annotation'}</button
 			>
 		</div>
 	</div>

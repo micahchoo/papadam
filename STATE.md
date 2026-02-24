@@ -8,38 +8,37 @@ _Last updated: 2026-02-24. Overwrite this file each loop; do not append._
 
 | Check | Result |
 |---|---|
-| `ruff check api/` | 0 errors |
-| `mypy` (new files) | 0 errors |
+| `ruff check papadapi/annotate/` | 0 errors |
+| `mypy papadapi/annotate/` | 0 errors (pre-existing errors in queue.py unchanged) |
 | `lint-imports` | 10/10 contracts kept |
-| `django check` | 0 errors, 1 silenced warning (static dir missing — dev-only) |
-| `svelte-check` | 0 errors, 0 warnings (581 files) |
-| `eslint` | 0 errors, 0 warnings |
-| `pytest papadapi/annotate/` | 23/23 passed |
-| `pytest papadapi/` (full) | 94/94 passed |
-| `seed_dev` | runs clean — admin/admin, demo/demo, Demo Community, 6 tags |
+| `svelte-check` | 0 errors, 0 warnings (582 files) |
+| `eslint` (new/modified files) | 0 errors |
+| `pytest papadapi/annotate/` | 31/31 passed |
+| `pytest papadapi/` (full) | 113/113 passed |
 
 ---
 
-## Delta (this session — round 11)
+## Delta (this session — round 13)
 
-### Frontend: settings page — all UIConfig fields now exposed
+### Backend: annotation HLS transcode pipeline
 
-- `settings/+page.svelte`: Added 9 new state variables (`brandLogoUrl`, `iconSet`, `skipBackward`, `skipForward`, `showWaveform`, `showTranscript`, `defaultQuality`, `allowImages`, `allowAudio`, `allowVideo`, `allowMediaRef`, `timeRangeInput`, `exhibitEnabled`)
-- `loadFromStore()` now populates all fields including nested `player_controls`, `annotations_config`, `exhibit_config`
-- `save()` PATCH payload now includes all fields: full `player_controls` sub-object (skip_seconds as [backward, forward] tuple), full `annotations_config` sub-object, `exhibit_config`
-- Added 3 new fieldsets: **Player** (skip sliders, quality select, waveform/transcript toggles), **Annotations** (time_range_input select, 4 allow_* checkboxes), **Features** (exhibit_config.enabled)
-- Added `brand_logo_url` URL input and `icon_set` text input to existing Branding fieldset
-- Types: `MediaQuality` and `TimeRangeInput` imported from `$lib/api`; all `$state` calls explicitly typed
+- `annotate/tasks.py`: New ARQ tasks `transcode_annotation_audio` and `transcode_annotation_video`
+  - Probe bitrate/resolution via ffprobe, transcode to HLS with ffmpeg, upload to MinIO, overwrite field `.name` to manifest path
+  - On ffmpeg failure: field NOT updated — raw file remains playable natively
+  - MinIO helpers duplicated from `archive/tasks.py` (YAGNI — `# TODO(loop):` to extract when 3rd consumer appears)
+- `annotate/views.py`: `AnnotationCreateSet.create()` enqueues `transcode_annotation_audio`/`transcode_annotation_video` after `m.save()` when audio/video file present
+- `annotate/tests/test_tasks.py`: 5 new async tests (audio: 3, video: 2) — all import at top, ruff-clean
+- `annotate/tests/test_create_update.py`: 3 new enqueue tests (audio, video, text-no-op) — all import at top, ruff-clean
+- `worker.py`: `transcode_annotation_audio` and `transcode_annotation_video` registered in `WorkerSettings.functions`
 
-### Doc: ARCHITECTURE.md — ExhibitBlock drift corrected
+### Frontend: HLS-capable annotation media player
 
-- `ExhibitBlock.block_type`: removed `"text" | "heading" | "divider"` — only `"media" | "annotation"` exist in model + frontend type
-- Removed non-existent fields: `media (FK)`, `annotation (FK)`, `text_content`, `start_time`, `end_time`, `display_options` — actual fields are `media_uuid`, `annotation_uuid`, `caption`
-- API table: removed `PUT .../blocks/{id}/` (not implemented); removed `GET .../publish/` (not implemented — Phase 5); added `PATCH /api/v1/exhibit/{uuid}/` (exists via UpdateModelMixin)
+- `ui/src/lib/components/primitives/AnnotationMedia.svelte`: New primitive — `<audio>`/`<video>` with HLS.js init, same pattern as `MediaPlayer.svelte`
+- `ui/src/lib/components/AnnotationViewer.svelte`: Replaced bare `<audio>`/`<video>` elements with `<AnnotationMedia>` for HLS support
 
-### Doc: common/serializers.py TODO → TODO(loop)
+### Docs
 
-- Line 109: `# TODO:` → `# TODO(loop):` — marks pre-existing unresolved issue for loop tracking; escalate if survives 3+ rounds
+- `ARCHITECTURE.md` Phase 3 checklist: audio/video reply upload items marked `[x]`
 
 ---
 
@@ -53,7 +52,8 @@ None.
 
 | Item | Rounds | Notes |
 |---|---|---|
-| ARQ transcoding for `annotation_audio` / `annotation_video` | 3 | Fields exist, view saves files, no ARQ convert task. Phase 5. |
+| Raw annotation files not deleted from MinIO after HLS transcode | 1 | TODO(loop) in `annotate/tasks.py`. No bucket cost concern yet. |
+| MinIO helpers duplicated in `annotate/tasks.py` | 1 | TODO(loop) to extract when a 3rd consumer appears. |
 | `[data-profile]` icon/voice rendering | 1→5 | Phase 5 design work first. |
 | `[data-voice]` TTS / voice UI | 1→5 | Phase 5. |
 | `UIConfig.offline_first` service worker | 1→5 | Phase 5. |

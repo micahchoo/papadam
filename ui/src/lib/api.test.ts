@@ -276,6 +276,19 @@ describe('exhibits', () => {
 			order: 0
 		});
 	});
+
+	it('blocks.delete deletes /api/v1/exhibit/{uuid}/blocks/{id}/', () => {
+		exhibits.blocks.delete('ex-uuid-1', 42);
+		expect(mockHttp.delete).toHaveBeenCalledWith('/api/v1/exhibit/ex-uuid-1/blocks/42/');
+	});
+
+	it('blocks.reorder posts block_ids to /api/v1/exhibit/{uuid}/blocks/reorder/', () => {
+		exhibits.blocks.reorder('ex-uuid-1', [3, 1, 2]);
+		expect(mockHttp.post).toHaveBeenCalledWith(
+			'/api/v1/exhibit/ex-uuid-1/blocks/reorder/',
+			{ block_ids: [3, 1, 2] }
+		);
+	});
 });
 
 describe('crdt', () => {
@@ -283,17 +296,17 @@ describe('crdt', () => {
 		vi.clearAllMocks();
 	});
 
-	it('loadState gets /api/v1/crdt/media/{uuid}/ as arraybuffer', () => {
+	it('loadState gets /api/v1/crdt/{uuid}/ as arraybuffer', () => {
 		crdt.loadState('media-uuid-1');
-		expect(mockHttp.get).toHaveBeenCalledWith('/api/v1/crdt/media/media-uuid-1/', {
+		expect(mockHttp.get).toHaveBeenCalledWith('/api/v1/crdt/media-uuid-1/', {
 			responseType: 'arraybuffer'
 		});
 	});
 
-	it('saveState puts binary to /api/v1/crdt/media/{uuid}/', () => {
+	it('saveState puts binary to /api/v1/crdt/{uuid}/', () => {
 		const bytes = new Uint8Array([1, 2, 3]);
 		crdt.saveState('media-uuid-1', bytes);
-		expect(mockHttp.put).toHaveBeenCalledWith('/api/v1/crdt/media/media-uuid-1/', bytes, {
+		expect(mockHttp.put).toHaveBeenCalledWith('/api/v1/crdt/media-uuid-1/', bytes, {
 			headers: { 'Content-Type': 'application/octet-stream' }
 		});
 	});

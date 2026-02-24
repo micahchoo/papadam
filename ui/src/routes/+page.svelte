@@ -15,17 +15,18 @@
 		</div>
 		<!-- Text Section -->
 		<div class="text-center md:text-left">
-			<h1 class="my-5 text-4xl font-black text-blue-100 md:text-7xl">{$uiConfig?.brand_name ?? 'Papad.alt'}</h1>
+			<h1 class="my-5 text-4xl font-black text-blue-100 md:text-7xl">
+				{$uiConfig?.brand_name ?? 'Papad.alt'}
+			</h1>
 			<p class="mt-1 max-w-md text-sm text-gray-100 md:text-lg">
 				Papad.alt is a front end written for the PAPAD API, developed by Janastu. Sankalana is a
 				hypermedia media fragment annotator.
 			</p>
-			<a href="/groups">
-				<button
-					class="mt-5 w-full rounded bg-blue-100 px-4 py-2 text-black hover:bg-blue-800 hover:text-white"
-				>
-					View Collections
-				</button>
+			<a
+				href="/groups"
+				class="mt-5 block w-full rounded bg-blue-100 px-4 py-2 text-center text-black hover:bg-blue-800 hover:text-white"
+			>
+				View Collections
 			</a>
 		</div>
 	</div>

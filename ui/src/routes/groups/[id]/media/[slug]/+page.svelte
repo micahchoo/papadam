@@ -31,10 +31,16 @@
 	/** Image annotations whose annotation_image is set — passed to MediaPlayer for overlay. */
 	const imageAnnotations = $derived(
 		annotations
-			.filter((a): a is Annotation & { annotation_image: string } =>
-				a.annotation_type === 'image' && a.annotation_image !== null
+			.filter(
+				(a): a is Annotation & { annotation_image: string } =>
+					a.annotation_type === 'image' && a.annotation_image !== null
 			)
-			.map((a): ImageAnnotation => ({ media_target: a.media_target, annotation_image: a.annotation_image }))
+			.map(
+				(a): ImageAnnotation => ({
+					media_target: a.media_target,
+					annotation_image: a.annotation_image
+				})
+			)
 	);
 
 	onMount(async () => {
@@ -126,7 +132,12 @@
 				{/if}
 			</div>
 
-			<MediaPlayer bind:this={mediaPlayerRef} src={recording.upload ?? ''} controls={true} {imageAnnotations} />
+			<MediaPlayer
+				bind:this={mediaPlayerRef}
+				src={recording.upload ?? ''}
+				controls={true}
+				{imageAnnotations}
+			/>
 
 			<h1 class="mt-4 text-2xl font-bold">{recording.name}</h1>
 			<p class="text-sm text-gray-500">
@@ -144,7 +155,7 @@
 				{/each}
 			</div>
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-		<p class="my-3">{@html DOMPurify.sanitize(recording.description)}</p>
+			<p class="my-3">{@html DOMPurify.sanitize(recording.description)}</p>
 		</div>
 
 		<!-- Right: annotations -->
@@ -159,11 +170,14 @@
 						+ Create Annotation
 					</button>
 				</div>
-				{#key annotations}
-					<div class="mt-2">
-						<AnnotationViewer {annotations} onPlaySnippet={handlePlaySnippet} {formatTime} onAnnotationDeleted={handleAnnotationDeleted} />
+							<div class="mt-2">
+						<AnnotationViewer
+							{annotations}
+							onPlaySnippet={handlePlaySnippet}
+							{formatTime}
+							onAnnotationDeleted={handleAnnotationDeleted}
+						/>
 					</div>
-				{/key}
 			</div>
 		</div>
 	</div>

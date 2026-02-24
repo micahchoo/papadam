@@ -106,13 +106,32 @@
 		}
 	}
 
+	let deleteError = $state<Record<number, string>>({});
+
 	async function deleteAnno(annotation: Annotation) {
+		deleteError = { ...deleteError, [annotation.id]: '' };
 		try {
 			await annoApi.delete(annotation.uuid);
 			onAnnotationDeleted?.(annotation.id);
-		} catch (err) {
-			console.error('Error deleting annotation:', err);
+		} catch {
+			deleteError = { ...deleteError, [annotation.id]: 'Delete failed.' };
 		}
+	}
+
+	const TYPE_BADGE: Record<string, string> = {
+		text: 'bg-gray-100 text-gray-600',
+		image: 'bg-blue-100 text-blue-700',
+		audio: 'bg-green-100 text-green-700',
+		video: 'bg-purple-100 text-purple-700',
+		media_ref: 'bg-orange-100 text-orange-700'
+	};
+
+	function formatDate(iso: string): string {
+		return new Date(iso).toLocaleDateString('en-GB', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
 	}
 </script>
 
@@ -121,6 +140,11 @@
 		<ul>
 			{#each rootAnnotations as annotation}
 				<li class="my-2 mb-5 rounded bg-white p-4 shadow-sm">
+					<span
+						class="mb-2 inline-block rounded px-2 py-0.5 text-xs font-medium {TYPE_BADGE[annotation.annotation_type] ?? 'bg-gray-100 text-gray-600'}"
+					>
+						{annotation.annotation_type}
+					</span>
 					{#if annotation.media_target && annotation.timeParts}
 						<p>
 							<strong>Timestamp:</strong>
@@ -185,6 +209,9 @@
 							</button>
 						{/if}
 					</div>
+					{#if deleteError[annotation.id]}
+						<p class="mt-1 text-xs text-red-600">{deleteError[annotation.id]}</p>
+					{/if}
 
 					<!-- Existing replies (prop-supplied + locally posted) -->
 					{#if allRepliesFor(annotation.id).length > 0}
@@ -195,7 +222,7 @@
 										{@html DOMPurify.sanitize(reply.annotation_text || '')}
 									</div>
 									<span class="text-xs text-gray-400">
-										{reply.created_by?.username ?? 'Unknown'} · {reply.created_at}
+										{reply.created_by?.username ?? 'Unknown'} · {formatDate(reply.created_at)}
 									</span>
 								</li>
 							{/each}

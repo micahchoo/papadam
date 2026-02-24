@@ -81,7 +81,6 @@ class ExhibitBlock(models.Model):
         verbose_name = _("Exhibit block")
         verbose_name_plural = _("Exhibit blocks")
         ordering = ["exhibit", "order"]
-        unique_together = [("exhibit", "order")]
 
     def __str__(self) -> str:
         return f"{self.exhibit.title} — block {self.order}"

@@ -47,7 +47,7 @@
 	<NavBar />
 
 	<!-- Main Content -->
-	<main class="bg-gray-100">
+	<main class="min-h-screen bg-gray-100">
 		{@render children()}
 	</main>
 

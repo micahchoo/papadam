@@ -133,6 +133,24 @@ class TestUIConfigView:
         for field in ("profile", "primary_color", "accent_color", "color_scheme"):
             assert field in resp.data
 
+    def test_get_anon_has_nested_sub_objects(self, api_client) -> None:
+        resp = api_client.get("/api/v1/uiconfig/")
+        assert resp.status_code == 200
+        pc = resp.data["player_controls"]
+        assert "skip_seconds" in pc
+        assert len(pc["skip_seconds"]) == 2
+        assert "show_waveform" in pc
+        assert "show_transcript" in pc
+        assert "default_quality" in pc
+        ac = resp.data["annotations_config"]
+        assert "allow_images" in ac
+        assert "allow_audio" in ac
+        assert "allow_video" in ac
+        assert "allow_media_ref" in ac
+        assert "time_range_input" in ac
+        ec = resp.data["exhibit_config"]
+        assert "enabled" in ec
+
     def test_get_auth_with_group_returns_config(self, member_client) -> None:
         resp = member_client.get("/api/v1/uiconfig/")
         assert resp.status_code == 200
@@ -159,3 +177,56 @@ class TestUIConfigView:
             format="json",
         )
         assert resp.status_code == 401
+
+    def test_patch_player_controls_round_trips(self, member_client) -> None:
+        from papadapi.common.models import UIConfig
+
+        payload = {
+            "player_controls": {
+                "skip_seconds": [5, 15],
+                "show_waveform": True,
+                "show_transcript": True,
+                "default_quality": "low",
+            }
+        }
+        resp = member_client.patch("/api/v1/uiconfig/", data=payload, format="json")
+        assert resp.status_code == 200
+        pc = resp.data["player_controls"]
+        assert pc["skip_seconds"] == [5, 15]
+        assert pc["show_waveform"] is True
+        assert pc["default_quality"] == "low"
+        cfg = UIConfig.objects.get(group=member_client.group)
+        assert cfg.player_controls["skip_seconds"] == [5, 15]
+
+    def test_patch_annotations_config_round_trips(self, member_client) -> None:
+        from papadapi.common.models import UIConfig
+
+        payload = {
+            "annotations_config": {
+                "allow_images": False,
+                "allow_audio": True,
+                "allow_video": False,
+                "allow_media_ref": True,
+                "time_range_input": "timestamp",
+            }
+        }
+        resp = member_client.patch("/api/v1/uiconfig/", data=payload, format="json")
+        assert resp.status_code == 200
+        ac = resp.data["annotations_config"]
+        assert ac["allow_images"] is False
+        assert ac["time_range_input"] == "timestamp"
+        cfg = UIConfig.objects.get(group=member_client.group)
+        assert cfg.annotations_config["allow_images"] is False
+
+    def test_patch_exhibit_config_round_trips(self, member_client) -> None:
+        from papadapi.common.models import UIConfig
+
+        resp = member_client.patch(
+            "/api/v1/uiconfig/",
+            data={"exhibit_config": {"enabled": False}},
+            format="json",
+        )
+        assert resp.status_code == 200
+        assert resp.data["exhibit_config"]["enabled"] is False
+        cfg = UIConfig.objects.get(group=member_client.group)
+        assert cfg.exhibit_config["enabled"] is False

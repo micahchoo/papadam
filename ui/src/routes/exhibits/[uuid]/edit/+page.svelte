@@ -2,8 +2,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { exhibits } from '$lib/api';
-	import type { ExhibitBlock, ExhibitBlockType } from '$lib/api';
+	import { archive, exhibits } from '$lib/api';
+	import type { ExhibitBlock, ExhibitBlockType, MediaStore } from '$lib/api';
 	import { isAuthenticated, exhibitEnabled } from '$lib/stores';
 
 	const exhibitUuid = $derived($page.params['uuid'] ?? '');
@@ -21,16 +21,33 @@
 
 	// Add block form
 	let newBlockType = $state<ExhibitBlockType>('media');
-	let newBlockUuid = $state('');
+	// For media type: pick from loaded list; for annotation type: type UUID
+	let selectedMediaUuid = $state('');
+	let newAnnotationUuid = $state('');
 	let newBlockCaption = $state('');
 	let addingBlock = $state(false);
 	let addBlockError = $state('');
 
+	// Group media picker
+	let groupMedia = $state<MediaStore[]>([]);
+	let mediaSearch = $state('');
+	const filteredMedia = $derived(
+		mediaSearch.trim()
+			? groupMedia.filter((m) => m.name.toLowerCase().includes(mediaSearch.toLowerCase()))
+			: groupMedia
+	);
+
 	// Block deletion
 	let deletingBlockId = $state<number | null>(null);
+	let blockActionError = $state('');
+
+	// Block reorder
+	let reordering = $state(false);
 
 	// Delete exhibit
 	let deleting = $state(false);
+	let deleteError = $state('');
+	let showDeleteConfirm = $state(false);
 
 	let loading = $state(true);
 	let error = $state('');
@@ -50,6 +67,18 @@
 			editDescription = data.description;
 			editIsPublic = data.is_public;
 			blocks = data.blocks;
+
+			// Load group media for the picker (up to 100 items)
+			if (data.group) {
+				const mediaResp = await archive.list({
+					searchFrom: 'selected_collections',
+					searchCollections: String(data.group),
+					page_size: 100
+				});
+				groupMedia = mediaResp.data.results;
+				const first = groupMedia[0];
+				if (first) selectedMediaUuid = first.uuid;
+			}
 		} catch {
 			error = 'Exhibit not found.';
 		} finally {
@@ -79,8 +108,10 @@
 	}
 
 	async function handleAddBlock() {
-		if (!newBlockUuid.trim()) {
-			addBlockError = 'UUID is required.';
+		const blockUuid = newBlockType === 'media' ? selectedMediaUuid : newAnnotationUuid.trim();
+		if (!blockUuid) {
+			addBlockError =
+				newBlockType === 'media' ? 'Select a media item.' : 'Annotation UUID is required.';
 			return;
 		}
 		const nextOrder = blocks.length > 0 ? Math.max(...blocks.map((b) => b.order)) + 1 : 0;
@@ -89,17 +120,22 @@
 		try {
 			const payload = {
 				block_type: newBlockType,
-				media_uuid: newBlockType === 'media' ? newBlockUuid.trim() : null,
-				annotation_uuid: newBlockType === 'annotation' ? newBlockUuid.trim() : null,
+				media_uuid: newBlockType === 'media' ? blockUuid : null,
+				annotation_uuid: newBlockType === 'annotation' ? blockUuid : null,
 				caption: newBlockCaption.trim(),
 				order: nextOrder
 			};
 			const { data: newBlock } = await exhibits.blocks.create(exhibitUuid, payload);
 			blocks = [...blocks, newBlock];
-			newBlockUuid = '';
 			newBlockCaption = '';
+			if (newBlockType === 'media') {
+				const first = groupMedia[0];
+				if (first) selectedMediaUuid = first.uuid;
+			} else {
+				newAnnotationUuid = '';
+			}
 		} catch {
-			addBlockError = 'Failed to add block. Check that the UUID is valid.';
+			addBlockError = 'Failed to add block. Check that the UUID exists.';
 		} finally {
 			addingBlock = false;
 		}
@@ -107,26 +143,75 @@
 
 	async function handleDeleteBlock(blockId: number) {
 		deletingBlockId = blockId;
+		blockActionError = '';
 		try {
 			await exhibits.blocks.delete(exhibitUuid, blockId);
 			blocks = blocks.filter((b) => b.id !== blockId);
 		} catch {
-			alert('Failed to remove block.');
+			blockActionError = 'Failed to remove block.';
 		} finally {
 			deletingBlockId = null;
 		}
 	}
 
+	async function handleMoveBlock(blockId: number, dir: 'up' | 'down') {
+		const idx = blocks.findIndex((b) => b.id === blockId);
+		if (idx < 0) return;
+		const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+		if (swapIdx < 0 || swapIdx >= blocks.length) return;
+
+		// Extract references before mapping — avoids non-null assertion on array access
+		const blockAtIdx = blocks[idx];
+		const blockAtSwap = blocks[swapIdx];
+		if (!blockAtIdx || !blockAtSwap) return;
+
+		// Optimistic local reorder
+		const reordered = blocks.map((b, i) => {
+			if (i === idx) return blockAtSwap;
+			if (i === swapIdx) return blockAtIdx;
+			return b;
+		});
+		blocks = reordered;
+
+		reordering = true;
+		try {
+			await exhibits.blocks.reorder(
+				exhibitUuid,
+				reordered.map((b) => b.id)
+			);
+		} catch {
+			// Revert — swap back
+			const revertA = reordered[idx];
+			const revertB = reordered[swapIdx];
+			if (revertA && revertB) {
+				blocks = reordered.map((b, i) => {
+					if (i === idx) return revertB;
+					if (i === swapIdx) return revertA;
+					return b;
+				});
+			}
+			blockActionError = 'Failed to reorder blocks.';
+		} finally {
+			reordering = false;
+		}
+	}
+
 	async function handleDelete() {
-		if (!confirm('Delete this exhibit? This cannot be undone.')) return;
 		deleting = true;
+		deleteError = '';
 		try {
 			await exhibits.delete(exhibitUuid);
 			await goto('/exhibits');
 		} catch {
+			deleteError = 'Failed to delete exhibit.';
+		} finally {
 			deleting = false;
-			alert('Failed to delete exhibit.');
+			showDeleteConfirm = false;
 		}
+	}
+
+	function mediaLabel(m: MediaStore): string {
+		return `${m.name} (${m.file_extension})`;
 	}
 </script>
 
@@ -190,12 +275,36 @@
 		<section class="mb-8 rounded-lg bg-white p-6 shadow-sm">
 			<h2 class="mb-4 text-lg font-semibold text-gray-700">Blocks ({blocks.length})</h2>
 
+			{#if blockActionError}
+				<p class="mb-3 rounded bg-red-100 px-3 py-2 text-sm text-red-700">{blockActionError}</p>
+			{/if}
+
 			{#if blocks.length === 0}
 				<p class="text-sm text-gray-400">No blocks yet. Add one below.</p>
 			{:else}
 				<ol class="space-y-2">
-					{#each blocks as block}
-						<li class="flex items-start gap-3 rounded border border-gray-200 p-3">
+					{#each blocks as block, idx}
+						<li class="flex items-start gap-2 rounded border border-gray-200 p-3">
+							<!-- Reorder buttons -->
+							<div class="flex shrink-0 flex-col gap-0.5">
+								<button
+									onclick={() => void handleMoveBlock(block.id, 'up')}
+									disabled={idx === 0 || reordering}
+									aria-label="Move block up"
+									class="rounded px-1 text-xs text-gray-400 hover:text-gray-700 disabled:opacity-20"
+								>
+									&#9650;
+								</button>
+								<button
+									onclick={() => void handleMoveBlock(block.id, 'down')}
+									disabled={idx === blocks.length - 1 || reordering}
+									aria-label="Move block down"
+									class="rounded px-1 text-xs text-gray-400 hover:text-gray-700 disabled:opacity-20"
+								>
+									&#9660;
+								</button>
+							</div>
+
 							<span
 								class="shrink-0 rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
 							>
@@ -241,16 +350,54 @@
 				<option value="annotation">Annotation</option>
 			</select>
 
-			<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-uuid">
-				{newBlockType === 'media' ? 'Media UUID' : 'Annotation UUID'}
-			</label>
-			<input
-				id="blk-uuid"
-				type="text"
-				bind:value={newBlockUuid}
-				placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-				class="mb-4 w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm focus:outline-none focus:ring focus:ring-blue-200"
-			/>
+			{#if newBlockType === 'media'}
+				{#if groupMedia.length > 0}
+					<label class="mb-1 block text-sm font-medium text-gray-600" for="media-search"
+						>Search media</label
+					>
+					<input
+						id="media-search"
+						type="search"
+						bind:value={mediaSearch}
+						placeholder="Filter by name…"
+						class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
+					/>
+					<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-media-select"
+						>Select media item</label
+					>
+					<select
+						id="blk-media-select"
+						bind:value={selectedMediaUuid}
+						class="mb-4 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
+					>
+						{#each filteredMedia as m}
+							<option value={m.uuid}>{mediaLabel(m)}</option>
+						{/each}
+					</select>
+				{:else}
+					<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-uuid"
+						>Media UUID</label
+					>
+					<input
+						id="blk-uuid"
+						type="text"
+						bind:value={selectedMediaUuid}
+						placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+						class="mb-4 w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm focus:outline-none focus:ring focus:ring-blue-200"
+					/>
+				{/if}
+			{:else}
+				<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-ann-uuid"
+					>Annotation UUID</label
+				>
+				<input
+					id="blk-ann-uuid"
+					type="text"
+					bind:value={newAnnotationUuid}
+					placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+					class="mb-4 w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm focus:outline-none focus:ring focus:ring-blue-200"
+				/>
+			{/if}
 
 			<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-caption"
 				>Caption (optional)</label
@@ -274,13 +421,36 @@
 		<!-- Danger zone -->
 		<section class="rounded-lg border border-red-200 bg-red-50 p-6">
 			<h2 class="mb-3 text-lg font-semibold text-red-700">Danger Zone</h2>
-			<button
-				onclick={() => void handleDelete()}
-				disabled={deleting}
-				class="rounded bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50"
-			>
-				{deleting ? 'Deleting…' : 'Delete Exhibit'}
-			</button>
+			{#if deleteError}
+				<p class="mb-3 rounded bg-red-200 px-3 py-2 text-sm text-red-800">{deleteError}</p>
+			{/if}
+			{#if showDeleteConfirm}
+				<div class="mb-3 rounded border border-red-300 bg-white p-4">
+					<p class="mb-3 text-sm text-gray-700">Delete this exhibit? This cannot be undone.</p>
+					<div class="flex gap-3">
+						<button
+							onclick={() => (showDeleteConfirm = false)}
+							class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-700 hover:bg-gray-300"
+						>
+							Cancel
+						</button>
+						<button
+							onclick={() => void handleDelete()}
+							disabled={deleting}
+							class="rounded bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600 disabled:opacity-50"
+						>
+							{deleting ? 'Deleting…' : 'Yes, delete'}
+						</button>
+					</div>
+				</div>
+			{:else}
+				<button
+					onclick={() => (showDeleteConfirm = true)}
+					class="rounded bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600"
+				>
+					Delete Exhibit
+				</button>
+			{/if}
 		</section>
 	</div>
 {/if}

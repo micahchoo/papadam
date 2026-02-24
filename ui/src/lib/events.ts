@@ -43,7 +43,7 @@ export function pollJob(
 				// Transient network error — keep polling
 			}
 			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- TypeScript narrows `active` to true inside while(active), but stop() can mutate it across an await boundary
-		if (!active) break;
+			if (!active) break;
 			await new Promise<void>((resolve) => setTimeout(resolve, intervalMs));
 		}
 	}

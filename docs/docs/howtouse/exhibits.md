@@ -35,12 +35,29 @@ Each item in an exhibit is a **block**. Blocks are displayed in the order they w
 3. Choose a block type:
    - **Media** — a media item from the archive (audio, video, or image)
    - **Annotation** — a specific annotation from a media item
-4. Enter the **UUID** of the media or annotation.
-   Copy a media UUID from the address bar on a media item's detail page.
+4. For **Media** blocks: use the search box to filter by name, then select an item
+   from the dropdown. If no media has been uploaded to the group yet, enter the UUID manually.
+   For **Annotation** blocks: enter the annotation UUID.
 5. Optionally add a **Caption** — text shown beneath the block.
 6. Click **Add Block**.
 
 The block is added to the end of the list and appears immediately.
+
+---
+
+## Reordering blocks
+
+Each block in the list has ▲ and ▼ buttons on the left.
+Click ▲ to move a block one position up, ▼ to move it one position down.
+The first block's ▲ and the last block's ▼ are disabled.
+The new order saves to the server automatically.
+
+---
+
+## Removing a block
+
+Click **Remove** next to any block to delete it from the exhibit.
+The block is removed immediately. The original media or annotation in the archive is not affected.
 
 ---
 
@@ -82,7 +99,7 @@ Ask your group admin to enable it: **Settings → Features → Enable exhibit bu
 
 You do not have an active group selected. Open **Collections**, click a group, then return to **Exhibits** and try again.
 
-**"Failed to add block. Check that the UUID is valid."**
+**"Failed to add block. Check that the UUID exists."**
 
 The UUID you entered does not match any media item or annotation.
 Copy the UUID directly from the media item's detail page URL.

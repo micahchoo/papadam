@@ -540,8 +540,8 @@ Local dev: set `VITE_API_URL` + `VITE_CRDT_URL` in `ui/.env.local` instead.
 - adapter-static SPA build → `ui/build/` served by nginx container
 
 ### Phase 3 — Media depth + inclusivity
-- [ ] Image overlay annotations during video/audio playback
-- [ ] Audio + video reply annotation upload UI (backend needs new file fields; API model has `annotation_image` only)
+- [x] Image overlay annotations during video/audio playback
+- [x] Audio + video reply annotation upload UI — raw upload + HLS transcode pipeline wired
 - [ ] Whisper transcript display in media player
 - [ ] Service worker + offline annotation queue + background sync
 - [ ] WCAG AA audit + fixes

@@ -11,7 +11,7 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'json', 'html'],
-			all: true,                // include files never imported in any test (shows 0% gaps)
+			all: true, // include files never imported in any test (shows 0% gaps)
 			include: ['src/lib/**'],
 			exclude: [
 				// Generated Paraglide runtime — not source code
@@ -24,7 +24,7 @@ export default defineConfig({
 			thresholds: {
 				lines: 80,
 				functions: 80,
-				branches: 80           // raised from 70 — aligned with line/function gates
+				branches: 80 // raised from 70 — aligned with line/function gates
 			}
 		}
 	},

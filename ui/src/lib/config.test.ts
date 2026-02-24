@@ -9,6 +9,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 beforeEach(() => {
 	vi.resetModules();
+	// Clear VITE_API_URL/VITE_CRDT_URL so .env.local values don't short-circuit config.ts.
+	// Tests that need a specific value stub it explicitly; afterEach calls vi.unstubAllEnvs().
+	vi.stubEnv('VITE_API_URL', '');
+	vi.stubEnv('VITE_CRDT_URL', '');
 });
 
 afterEach(() => {

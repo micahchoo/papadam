@@ -239,10 +239,9 @@ http.interceptors.response.use(
 			const refresh = localStorage.getItem('refresh_token');
 			if (refresh) {
 				try {
-					const { data } = await axios.post<{ access: string }>(
-						`${baseURL}/auth/jwt/refresh/`,
-						{ refresh }
-					);
+					const { data } = await axios.post<{ access: string }>(`${baseURL}/auth/jwt/refresh/`, {
+						refresh
+					});
 					localStorage.setItem('access_token', data.access);
 					original.headers['Authorization'] = `Bearer ${data.access}`;
 					return await http(original);
@@ -306,6 +305,7 @@ export const archive = {
 		searchFrom?: 'all_collections' | 'my_collections' | 'public' | 'selected_collections';
 		searchCollections?: string; // comma-separated group IDs
 		page?: number;
+		page_size?: number;
 	}) => http.get<PaginatedResponse<MediaStore>>('/api/v1/archive/', { params }),
 
 	get: (uuid: string) => http.get<MediaStore>(`/api/v1/archive/${uuid}/`),
@@ -399,7 +399,17 @@ export const exhibits = {
 
 		/** DELETE /api/v1/exhibit/<uuid>/blocks/<id>/ — remove a block */
 		delete: (exhibitUuid: string, blockId: number) =>
-			http.delete(`/api/v1/exhibit/${exhibitUuid}/blocks/${blockId}/`)
+			http.delete(`/api/v1/exhibit/${exhibitUuid}/blocks/${blockId}/`),
+
+		/**
+		 * POST /api/v1/exhibit/<uuid>/blocks/reorder/
+		 * Body: { block_ids: number[] } — ordered list of block PKs for this exhibit.
+		 * Sets each block's order to its index in the supplied list.
+		 */
+		reorder: (exhibitUuid: string, blockIds: number[]) =>
+			http.post<ExhibitBlock[]>(`/api/v1/exhibit/${exhibitUuid}/blocks/reorder/`, {
+				block_ids: blockIds
+			})
 	}
 };
 

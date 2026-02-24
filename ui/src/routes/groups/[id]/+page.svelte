@@ -58,7 +58,11 @@
 	<!-- Right: Media Cards -->
 	<div class="mb-6 w-full flex-1 overflow-y-auto px-3 md:my-6 md:w-3/4">
 		<SearchSort bind:sortedRecordings bind:filteredRecordings />
-		{#if $groupMediaList.length > 0}
+		{#if loading}
+			<p class="py-8 text-center text-sm text-gray-400">Loading media…</p>
+		{:else if $groupMediaList.length === 0}
+			<p class="py-8 text-center text-sm text-gray-500">No media uploaded yet.</p>
+		{:else}
 			<div class="grid grid-cols-1 gap-y-4">
 				{#each filteredRecordings as recording}
 					<div class="relative min-h-40 bg-white">
@@ -80,18 +84,18 @@
 								{/if}
 							{/each}
 						</div>
-						<a href="{groupId}/media/{recording.uuid}">
-							<button
-								class="mt-5 w-full bg-blue-950 px-4 py-4 text-white hover:bg-blue-600 md:absolute md:bottom-0 md:right-0 md:w-fit"
-							>
-								View Media
-							</button>
+						<a
+							href="{groupId}/media/{recording.uuid}"
+							class="mt-5 block w-full bg-blue-950 px-4 py-4 text-center text-white hover:bg-blue-600 md:absolute md:bottom-0 md:right-0 md:w-fit"
+						>
+							View Media
 						</a>
 					</div>
 				{/each}
+				{#if filteredRecordings.length === 0}
+					<p class="py-8 text-center text-sm text-gray-400">No results match your search.</p>
+				{/if}
 			</div>
-		{:else if !loading}
-			<p class="text-gray-500">No media found.</p>
 		{/if}
 	</div>
 </div>

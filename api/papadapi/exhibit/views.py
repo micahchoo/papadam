@@ -5,6 +5,7 @@ exhibit/views.py — CRUD for Exhibit and ExhibitBlock.
 from typing import Any, cast
 
 import structlog
+from django.db import transaction
 from django.db.models import QuerySet
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -30,7 +31,7 @@ class ExhibitViewSet(
     mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
-    viewsets.GenericViewSet,
+    viewsets.GenericViewSet[Exhibit],
 ):
     """
     list:   GET  /api/v1/exhibit/                — public exhibits
@@ -102,3 +103,42 @@ class ExhibitViewSet(
             "exhibit_block_deleted", exhibit_uuid=str(exhibit.uuid), block_id=block_id
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="blocks/reorder",
+        permission_classes=[IsAuthenticated],
+    )
+    def reorder_blocks(self, request: Request, uuid: str | None = None) -> Response:
+        """POST /api/v1/exhibit/<uuid>/blocks/reorder/ — set display order.
+
+        Body: {"block_ids": [<id>, <id>, ...]}  — ordered list of block PKs
+        belonging to this exhibit. Each block's ``order`` is set to its index
+        in the supplied list.  All IDs must belong to this exhibit.
+        """
+        exhibit = self.get_object()
+        block_ids: Any = request.data.get("block_ids")
+        if not isinstance(block_ids, list) or not all(
+            isinstance(i, int) for i in block_ids
+        ):
+            return Response(
+                {"detail": "block_ids must be a list of integers."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        blocks_by_id = {
+            b.id: b
+            for b in ExhibitBlock.objects.filter(exhibit=exhibit, id__in=block_ids)
+        }
+        if len(blocks_by_id) != len(block_ids):
+            return Response(
+                {"detail": "Some block IDs not found in this exhibit."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        for idx, block_id in enumerate(block_ids):
+            blocks_by_id[block_id].order = idx
+        with transaction.atomic():
+            ExhibitBlock.objects.bulk_update(list(blocks_by_id.values()), ["order"])
+        log.info("exhibit_blocks_reordered", exhibit_uuid=str(exhibit.uuid))
+        updated_qs = ExhibitBlock.objects.filter(exhibit=exhibit).order_by("order")
+        return Response(ExhibitBlockSerializer(updated_qs, many=True).data)

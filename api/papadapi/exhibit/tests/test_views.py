@@ -1,5 +1,6 @@
 """Tests for the Exhibit CRUD API."""
 
+import uuid
 
 import pytest
 
@@ -130,6 +131,116 @@ def test_delete_block_requires_auth(api_client, exhibit, media):
     )
     resp = api_client.delete(f"/api/v1/exhibit/{exhibit.uuid}/blocks/{block.id}/")
     assert resp.status_code == 401
+
+
+# ── Block UUID referential integrity ──────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_block_rejects_nonexistent_media_uuid(auth_client, exhibit):
+    """media_uuid must reference an existing MediaStore."""
+    resp = auth_client.post(
+        f"/api/v1/exhibit/{exhibit.uuid}/blocks/",
+        data={
+            "block_type": "media",
+            "media_uuid": str(uuid.uuid4()),  # random — does not exist
+            "order": 0,
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "media_uuid" in resp.data
+
+
+@pytest.mark.django_db
+def test_block_rejects_nonexistent_annotation_uuid(auth_client, exhibit):
+    """annotation_uuid must reference an existing Annotation."""
+    resp = auth_client.post(
+        f"/api/v1/exhibit/{exhibit.uuid}/blocks/",
+        data={
+            "block_type": "annotation",
+            "annotation_uuid": str(uuid.uuid4()),  # random — does not exist
+            "order": 0,
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "annotation_uuid" in resp.data
+
+
+@pytest.mark.django_db
+def test_block_accepts_valid_annotation_uuid(auth_client, exhibit, annotation):
+    """annotation_uuid that exists passes validation."""
+    resp = auth_client.post(
+        f"/api/v1/exhibit/{exhibit.uuid}/blocks/",
+        data={
+            "block_type": "annotation",
+            "annotation_uuid": str(annotation.uuid),
+            "order": 0,
+        },
+        format="json",
+    )
+    assert resp.status_code == 201
+
+
+# ── Block reorder ──────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_reorder_blocks(auth_client, exhibit, media):
+    """Reorder reverses the position of two blocks."""
+    b0 = ExhibitBlock.objects.create(
+        exhibit=exhibit, block_type="media", media_uuid=media.uuid, order=0
+    )
+    b1 = ExhibitBlock.objects.create(
+        exhibit=exhibit, block_type="media", media_uuid=media.uuid, order=1
+    )
+    resp = auth_client.post(
+        f"/api/v1/exhibit/{exhibit.uuid}/blocks/reorder/",
+        data={"block_ids": [b1.id, b0.id]},
+        format="json",
+    )
+    assert resp.status_code == 200
+    b0.refresh_from_db()
+    b1.refresh_from_db()
+    assert b1.order == 0
+    assert b0.order == 1
+
+
+@pytest.mark.django_db
+def test_reorder_blocks_unknown_id(auth_client, exhibit):
+    """Returns 400 when a block_id does not belong to this exhibit."""
+    resp = auth_client.post(
+        f"/api/v1/exhibit/{exhibit.uuid}/blocks/reorder/",
+        data={"block_ids": [99999]},
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_reorder_blocks_requires_auth(api_client, exhibit, media):
+    """Unauthenticated reorder is rejected."""
+    b0 = ExhibitBlock.objects.create(
+        exhibit=exhibit, block_type="media", media_uuid=media.uuid, order=0
+    )
+    resp = api_client.post(
+        f"/api/v1/exhibit/{exhibit.uuid}/blocks/reorder/",
+        data={"block_ids": [b0.id]},
+        format="json",
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.django_db
+def test_reorder_blocks_invalid_payload(auth_client, exhibit):
+    """Non-list block_ids returns 400."""
+    resp = auth_client.post(
+        f"/api/v1/exhibit/{exhibit.uuid}/blocks/reorder/",
+        data={"block_ids": "not-a-list"},
+        format="json",
+    )
+    assert resp.status_code == 400
 
 
 # ── Update ────────────────────────────────────────────────────────────────────
