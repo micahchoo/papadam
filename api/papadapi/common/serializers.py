@@ -2,10 +2,10 @@ from django.db.models import Count, F
 from rest_framework import serializers
 from rest_framework.pagination import PageNumberPagination
 
-from papadapi.archive.models import MediaStore
 from papadapi.annotate.models import Annotation
-from papadapi.users.serializers import UserSerializer
+from papadapi.archive.models import MediaStore
 from papadapi.common.functions import get_final_tags_count
+from papadapi.users.serializers import UserSerializer
 
 from .models import Group, Question, Tags
 
@@ -69,12 +69,12 @@ class GroupSerializer(serializers.ModelSerializer):
             "media_count"
         )
 
-    def get_media_count(self,obj):
+    def get_media_count(self, obj):
         return MediaStore.objects.filter(group=obj.id).count()
-    
-    def get_users_count(self,obj):
+
+    def get_users_count(self, obj):
         return Group.objects.get(id=obj.id).users.count()
-     
+
     def get_tags(self, obj):
         media_tags_count = (
             MediaStore.objects.filter(group=obj.id)
@@ -84,14 +84,20 @@ class GroupSerializer(serializers.ModelSerializer):
             .order_by("-count")
         )
         annotation_tags_count = (
-                Annotation.objects.filter(media_reference_id__in=list(MediaStore.objects.filter(group=obj.id)))
-                .values("tags")
-                .annotate(count=Count("tags"))
-                .annotate(tag_id=F("tags__id"))
-                .values("tag_id", "tags__name", "count")
-                .order_by("-count")
+            Annotation.objects.filter(
+                media_reference_id__in=list(
+                    MediaStore.objects.filter(group=obj.id)
+                )
             )
-        tags_count = get_final_tags_count(list(media_tags_count),list(annotation_tags_count),count=True)
+            .values("tags")
+            .annotate(count=Count("tags"))
+            .annotate(tag_id=F("tags__id"))
+            .values("tag_id", "tags__name", "count")
+            .order_by("-count")
+        )
+        tags_count = get_final_tags_count(
+            list(media_tags_count), list(annotation_tags_count), count=True
+        )
         return GroupTagSerializer(tags_count, many=True).data
 
 
@@ -126,16 +132,22 @@ class UpdateGroupSerializer(serializers.ModelSerializer):
             .order_by("-count")
         )
         annotation_tags_count = (
-                Annotation.objects.filter(media_reference_id__in=list(MediaStore.objects.filter(group=obj.id)))
-                .values("tags")
-                .annotate(count=Count("tags"))
-                .annotate(tag_id=F("tags__id"))
-                .values("tag_id", "tags__name", "count")
-                .order_by("-count")
+            Annotation.objects.filter(
+                media_reference_id__in=list(
+                    MediaStore.objects.filter(group=obj.id)
+                )
             )
-        tags_count = get_final_tags_count(list(media_tags_count),list(annotation_tags_count),count=True)
-        print(tags_count)
+            .values("tags")
+            .annotate(count=Count("tags"))
+            .annotate(tag_id=F("tags__id"))
+            .values("tag_id", "tags__name", "count")
+            .order_by("-count")
+        )
+        tags_count = get_final_tags_count(
+            list(media_tags_count), list(annotation_tags_count), count=True
+        )
         return GroupTagSerializer(tags_count, many=True).data
+
 
 class GroupStatsSerializer(serializers.Serializer):
     created_date = serializers.DateField()

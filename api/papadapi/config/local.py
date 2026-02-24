@@ -10,11 +10,4 @@ class Local(Common):
 
     # Testing
     SECRET_KEY = "local"
-    INSTALLED_APPS = Common.INSTALLED_APPS + [
-        #"silk",
-        ]
-
     # Mail
-
-    # MEDIA_URL = f'http://minio1:9000/{AWS_STORAGE_BUCKET_NAME}/'
-    #MIDDLEWARE = Common.MIDDLEWARE + ["silk.middleware.SilkyMiddleware"]

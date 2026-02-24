@@ -1,7 +1,5 @@
-import os
 
 import sentry_sdk
-
 from environs import Env
 
 from .common import Common

@@ -1,26 +1,13 @@
-from datetime import timedelta
 
-from django.db.models import Count, Q
-from django.shortcuts import render
 from rest_framework import mixins, status, viewsets
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import (
-    AllowAny,
-    IsAuthenticated,
-    IsAuthenticatedOrReadOnly,
-)
 from rest_framework.response import Response
 
-from papadapi.annotate.models import Annotation
-from papadapi.archive.models import MediaStore
-from papadapi.common.models import Group
 from papadapi.common.serializers import CustomPageNumberPagination
 from papadapi.importexport.models import IERequest
 from papadapi.importexport.serializers import (
     ExportGroupDataSerializer,
-    ImportGroupDataSerializer,
 )
-from papadapi.importexport.tasks import export_request_task, import_request_task
+from papadapi.queue import enqueue_after
 
 
 class ExportGroupCreateListSet(
@@ -29,8 +16,6 @@ class ExportGroupCreateListSet(
     queryset = IERequest.objects.filter(is_complete=True)
     serializer_class = ExportGroupDataSerializer
     pagination_class = CustomPageNumberPagination
-    # permission_classes = [IsAnnotateCreateOrReadOnly]
-    authentication_classes = [TokenAuthentication]
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -42,7 +27,7 @@ class ExportGroupCreateListSet(
             request_type=request_type,
             ie_metadata=ie_metadata,
         )
-        export_request_task.schedule((ie.id,), delay=1)
+        enqueue_after("export_request_task", ie.id, delay=1)
         serilizer = ExportGroupDataSerializer(ie)
         return Response(serilizer.data)
 
@@ -51,8 +36,6 @@ class ImportGroupCreateSet(viewsets.GenericViewSet, mixins.CreateModelMixin):
     queryset = IERequest.objects.filter(is_complete=True)
     serializer_class = ExportGroupDataSerializer
     pagination_class = CustomPageNumberPagination
-    # permission_classes = [IsAnnotateCreateOrReadOnly]
-    authentication_classes = [TokenAuthentication]
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -71,7 +54,7 @@ class ImportGroupCreateSet(viewsets.GenericViewSet, mixins.CreateModelMixin):
         )
         ie.requested_file = files
         ie.save()
-        import_request_task.schedule((ie.id,), delay=1)
+        enqueue_after("import_request_task", ie.id, delay=1)
         serilizer = ExportGroupDataSerializer(ie)
         return Response(serilizer.data)
 
@@ -80,13 +63,10 @@ class ImportExportGroupViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixi
     queryset = IERequest.objects.filter(is_complete=True)
     serializer_class = ExportGroupDataSerializer
     pagination_class = CustomPageNumberPagination
-    # permission_classes = [IsAnnotateCreateOrReadOnly]
-    authentication_classes = [TokenAuthentication]
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
     def retrieve(self, request, *args, **kwargs):
-        # serializer = self.get_serializer(self.get_queryset(), many=True)
         request_id = self.kwargs["uuid"]
         queryset = IERequest.objects.filter(request_id=request_id)
         serializer = ExportGroupDataSerializer(queryset, many=True)
@@ -97,8 +77,6 @@ class UserImportExportViewer(viewsets.GenericViewSet, mixins.ListModelMixin):
     queryset = IERequest.objects.filter(is_complete=True)
     serializer_class = ExportGroupDataSerializer
     pagination_class = CustomPageNumberPagination
-    # permission_classes = [IsAnnotateCreateOrReadOnly]
-    authentication_classes = [TokenAuthentication]
 
     def get_queryset(self):
         user = self.request.user

@@ -1,0 +1,235 @@
+# papadam — monorepo CI pipeline
+#
+# Stages:  lint → test → e2e (manual)
+#
+# Strategy:
+#   • Jobs only run when their sub-project files change (rules:changes)
+#   • Ruff / mypy / bandit are scoped to new apps in this phase —
+#     legacy violations are reported non-blocking until migration completes
+#   • import-linter runs on the whole codebase (architecture contracts)
+#   • 80% pytest coverage gate (configured in api/pyproject.toml)
+#   • package-lock.json must be committed before ui:* jobs run
+#
+# New apps currently enforced:
+#   events  crdt  exhibit  media_relation  annotate/tests
+# Expand NEW_APPS as each legacy module is fully migrated.
+
+stages:
+  - lint
+  - test
+  - e2e
+
+default:
+  interruptible: true
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/api/.cache/pip"
+  # Plain standalone settings — no external services needed
+  DJANGO_SETTINGS_MODULE: "papadapi.config.test"
+
+# ── Hidden base jobs ───────────────────────────────────────────────────────────
+
+.api_changes:
+  rules:
+    - changes:
+        - "api/**/*"
+        - ".gitlab-ci.yml"
+      when: always
+    - when: never
+
+.ui_changes:
+  rules:
+    - changes:
+        - "ui/**/*"
+        - ".gitlab-ci.yml"
+      when: always
+    - when: never
+
+.api_base:
+  image: python:3.12-slim
+  before_script:
+    - cd api
+    - pip install --quiet --no-cache-dir -r requirements/requirements-dev.txt
+  cache:
+    key:
+      files:
+        - api/requirements/requirements-dev.txt
+    paths:
+      - api/.cache/pip
+
+.ui_base:
+  image: node:22-slim
+  before_script:
+    - cd ui
+    - npm ci --quiet
+  cache:
+    key:
+      files:
+        - ui/package-lock.json
+    paths:
+      - ui/node_modules/
+
+# ── API · lint ─────────────────────────────────────────────────────────────────
+
+api:ruff:
+  extends:
+    - .api_base
+    - .api_changes
+  stage: lint
+  script:
+    # STRICT: all new/migrated code must be violation-free
+    - >
+      ruff check
+      papadapi/events/
+      papadapi/crdt/
+      papadapi/exhibit/
+      papadapi/media_relation/
+      papadapi/annotate/tasks.py
+      papadapi/annotate/tests/
+      papadapi/archive/tasks.py
+      papadapi/archive/tests.py
+      papadapi/importexport/tasks.py
+      papadapi/importexport/tests.py
+      papadapi/queue.py
+      papadapi/worker.py
+      papadapi/config/test.py
+      papadapi/conftest.py
+    # INFORMATIONAL: full legacy report — exit-zero so build continues
+    - ruff check papadapi/ --statistics --exit-zero
+  allow_failure: false
+
+api:mypy:
+  extends:
+    - .api_base
+    - .api_changes
+  stage: lint
+  script:
+    # Round 28: full 10/10 app coverage (mild settings: ignore_missing_imports,
+    # no disallow_untyped_defs — safe to add without per-module overrides)
+    - >
+      mypy
+      papadapi/common/
+      papadapi/users/
+      papadapi/events/
+      papadapi/crdt/
+      papadapi/exhibit/
+      papadapi/media_relation/
+      papadapi/annotate/
+      papadapi/archive/
+      papadapi/importexport/
+      papadapi/queue.py
+      papadapi/worker.py
+      --config-file pyproject.toml
+      --no-error-summary
+  allow_failure: false
+
+api:arch:
+  extends:
+    - .api_base
+    - .api_changes
+  stage: lint
+  script:
+    # import-linter enforces the app dependency graph as code.
+    # Any contract violation fails the build exactly like a failing test.
+    - lint-imports
+  allow_failure: false
+
+api:bandit:
+  extends:
+    - .api_base
+    - .api_changes
+  stage: lint
+  script:
+    # Security scan — scoped to new/migrated code; -ll = medium+ severity
+    - >
+      bandit -r
+      papadapi/events/
+      papadapi/crdt/
+      papadapi/exhibit/
+      papadapi/media_relation/
+      papadapi/annotate/tasks.py
+      papadapi/archive/tasks.py
+      papadapi/importexport/tasks.py
+      papadapi/queue.py
+      -ll -c pyproject.toml
+  allow_failure: false
+
+# ── API · test ─────────────────────────────────────────────────────────────────
+
+api:pytest:
+  extends:
+    - .api_base
+    - .api_changes
+  stage: test
+  script:
+    # SQLite in-memory via config/test.py — no postgres service needed
+    - pytest -x --no-header -q
+  coverage: '/^TOTAL\s+\d+\s+\d+\s+(\d+)%/'
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: api/coverage.xml
+    paths:
+      - api/coverage.xml
+    expire_in: 30 days
+
+# ── UI · lint ──────────────────────────────────────────────────────────────────
+
+ui:svelte-check:
+  extends:
+    - .ui_base
+    - .ui_changes
+  stage: lint
+  script:
+    # Type checks all .svelte and .ts files (svelte-check + tsc)
+    - npm run check
+
+ui:eslint:
+  extends:
+    - .ui_base
+    - .ui_changes
+  stage: lint
+  script:
+    # eslint runs standard rules + eslint-plugin-boundaries (architecture graph).
+    # boundaries/element-types is 'error' in eslint.config.js — no separate step needed.
+    - npm run lint
+
+# ── UI · test ──────────────────────────────────────────────────────────────────
+
+ui:vitest:
+  extends:
+    - .ui_base
+    - .ui_changes
+  stage: test
+  script:
+    - npm run test
+  coverage: '/Lines\s*:\s*(\d+(?:\.\d+)?)%/'
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: ui/coverage/cobertura-coverage.xml
+    expire_in: 30 days
+
+# ── E2E (manual trigger) ───────────────────────────────────────────────────────
+
+ui:playwright:
+  extends: .ui_base
+  stage: e2e
+  rules:
+    - when: manual
+  before_script:
+    - cd ui
+    - npm ci --quiet
+    - npx playwright install --with-deps chromium firefox
+  script:
+    - npm run test:e2e
+  artifacts:
+    when: on_failure
+    paths:
+      - ui/test-results/
+      - ui/playwright-report/
+    expire_in: 7 days

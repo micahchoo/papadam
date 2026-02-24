@@ -1,47 +1,57 @@
-<script>
-    import {updateMedia} from '$lib/services/api.js';
-    export let showEditModal = false;
-    export let mediaName = '';
-    export let mediaDescription = '';
-    export let tags = '';
-    export let recordingUuid;
+<script lang="ts">
+	import { archive } from '$lib/api';
 
+	interface Props {
+		showEditModal: boolean;
+		mediaName: string;
+		mediaDescription: string;
+		recordingUuid: string;
+	}
+	let {
+		showEditModal = $bindable(),
+		mediaName = $bindable(),
+		mediaDescription = $bindable(),
+		recordingUuid
+	}: Props = $props();
 
-    const submitEdit = async () => {
-		// Validate the required fields
-		if (mediaName && mediaDescription ) {
-			const tagArray = tags.split(',').map((tag) => tag.trim()); // Convert tags to an array
-
-			try {
-				// Use the updateMedia function to make the API call
-				await updateMedia(recordingUuid, mediaName, mediaDescription, tagArray);
-				showEditModal = false; // Close the edit modal
-			} catch (error) {
-				console.error('Error updating media:', error);
-			}
-		} else {
-			console.warn('Please fill in all fields before submitting.');
+	async function submitEdit() {
+		if (!mediaName || !mediaDescription) {
+			console.warn('Please fill in all fields.');
+			return;
 		}
-	};
-
+		const formData = new FormData();
+		formData.append('name', mediaName);
+		formData.append('description', mediaDescription);
+		try {
+			await archive.update(recordingUuid, formData);
+			showEditModal = false;
+		} catch (err) {
+			console.error('Error updating media:', err);
+		}
+	}
 </script>
+
 <div class="fixed inset-0 z-50 flex items-center justify-center">
-    <div class="rounded bg-white p-6 shadow-md">
-        <h2 class="text-lg font-bold">Edit Media</h2>
-        <label>Name</label>
-        <input type="text" bind:value={mediaName} class="mb-4 w-full rounded border p-2" />
-
-        <label>Description</label>
-        <textarea bind:value={mediaDescription} class="mb-4 w-full rounded border p-2"></textarea>
-
-        <label>Tags</label>
-        <input type="text" bind:value={tags} class="mb-4 w-full rounded border p-2" />
-
-        <button on:click={submitEdit} class="rounded bg-blue-500 px-4 py-2 text-white">
-            Save Changes
-        </button>
-        <button on:click={() => (showEditModal = false)} class="ml-2 rounded bg-gray-300 px-4 py-2">
-            Cancel
-        </button>
-    </div>
+	<div class="rounded bg-white p-6 shadow-md">
+		<h2 class="text-lg font-bold">Edit Media</h2>
+		<label class="mt-4 block text-sm font-medium" for="edit-name">Name</label>
+		<input
+			id="edit-name"
+			type="text"
+			bind:value={mediaName}
+			class="mb-4 w-full rounded border p-2"
+		/>
+		<label class="block text-sm font-medium" for="edit-description">Description</label>
+		<textarea
+			id="edit-description"
+			bind:value={mediaDescription}
+			class="mb-4 w-full rounded border p-2"
+		></textarea>
+		<button onclick={() => void submitEdit()} class="rounded bg-blue-500 px-4 py-2 text-white"
+			>Save Changes</button
+		>
+		<button onclick={() => (showEditModal = false)} class="ml-2 rounded bg-gray-300 px-4 py-2"
+			>Cancel</button
+		>
+	</div>
 </div>

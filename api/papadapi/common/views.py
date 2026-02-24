@@ -1,22 +1,20 @@
 import json
 
-from django.db.models import Count, Q, F, Value
+from django.db.models import Count, F, Q, Value
 from django.db.models.functions import TruncDate
-from django.shortcuts import render, redirect
-from rest_framework.renderers import TemplateHTMLRenderer
-
+from django.shortcuts import redirect
 from rest_framework import generics, mixins, status, viewsets
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import (
     AllowAny,
-    IsAuthenticated,
     IsAuthenticatedOrReadOnly,
 )
+from rest_framework.renderers import TemplateHTMLRenderer
 from rest_framework.response import Response
 
-from papadapi.archive.models import MediaStore
 from papadapi.annotate.models import Annotation
-from papadapi.common.permissions import IsGroupOwnerMemberOrReadOnly, ReadOnly
+from papadapi.archive.models import MediaStore
+from papadapi.common.functions import get_final_tags_count, get_related_tags
+from papadapi.common.permissions import IsGroupOwnerMemberOrReadOnly
 from papadapi.common.serializers import CustomPageNumberPagination
 from papadapi.users.models import User
 from papadapi.users.permissions import IsSuperUser
@@ -28,7 +26,7 @@ from .serializers import (
     TagsSerializer,
     UpdateGroupSerializer,
 )
-from papadapi.common.functions import get_final_tags_count, get_related_tags
+
 
 class TagsViewSet(
     mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
@@ -40,12 +38,11 @@ class TagsViewSet(
     queryset = Tags.objects.all()
     serializer_class = TagsSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_paginated_response(self, data):
         return Response(data)
-    
+
     def get(self, request, *args, **kwargs):
         if self.request.user.is_anonymous:
             selected_groups = Group.objects.filter(is_active=True, is_public=True)
@@ -63,16 +60,22 @@ class TagsViewSet(
             .order_by("-count")
         )
         annotation_tags_count = (
-            Annotation.objects.filter(media_reference_id__in=list(MediaStore.objects.filter(group__in=selected_groups)))
+            Annotation.objects.filter(
+                media_reference_id__in=list(
+                    MediaStore.objects.filter(group__in=selected_groups)
+                )
+            )
             .values("tags")
             .annotate(count=Count("tags"))
             .annotate(tag_id=F("tags__id"))
             .values("tag_id", "tags__name", "count")
             .order_by("-count")
         )
-        tags_count = get_final_tags_count(list(media_tags_count),list(annotation_tags_count),count=True)
-        return Response({"results":tags_count})
-        
+        tags_count = get_final_tags_count(
+            list(media_tags_count), list(annotation_tags_count), count=True
+        )
+        return Response({"results": tags_count})
+
 
 
 class GroupViewSet(
@@ -85,7 +88,6 @@ class GroupViewSet(
     queryset = Group.objects.filter(is_public=True, is_active=True)
     serializer_class = GroupSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
@@ -106,9 +108,9 @@ class GroupViewSet(
             if "group_extra_questions" in data
             else None
         )
-        delete_wait_for = data["delete_wait_for"] if "delete_wait_for" in data else 0
+        delete_wait_for = data.get("delete_wait_for", 0)
         is_active = True
-        is_public = data["is_public"] if "is_public" in data else True
+        is_public = data.get("is_public", True)
         g = Group.objects.create(
             name=name,
             description=description,
@@ -132,10 +134,10 @@ class GroupViewSet(
             if len(data["users"]) > 0:
                 for user in users:
                     u = User.objects.get(id=user)
-                    if not u in g.users.all():
+                    if u not in g.users.all():
                         g.users.add(u)
-        serilizer = GroupSerializer(g)
-        return Response(serilizer.data)
+        serializer = GroupSerializer(g)
+        return Response(serializer.data)
 
 
 class UpdateGroupViewSet(
@@ -148,7 +150,6 @@ class UpdateGroupViewSet(
     queryset = Group.objects.all()
     serializer_class = UpdateGroupSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsGroupOwnerMemberOrReadOnly]
     lookup_field = "id"
     lookup_url_kwarg = "id"
@@ -158,12 +159,10 @@ class UpdateGroupViewSet(
         obj = self.get_object()
 
         g = Group.objects.get(id=obj.id)
-        name = data["name"] if "name" in data else g.name
-        description = data["description"] if "description" in data else g.description
-        delete_wait_for = (
-            data["delete_wait_for"] if "delete_wait_for" in data else g.delete_wait_for
-        )
-        is_public = data["is_public"] if "is_public" in data else g.is_public
+        name = data.get("name", g.name)
+        description = data.get("description", g.description)
+        delete_wait_for = data.get("delete_wait_for", g.delete_wait_for)
+        is_public = data.get("is_public", g.is_public)
         g.name = name
         g.description = description
         g.delete_wait_for = delete_wait_for
@@ -174,10 +173,10 @@ class UpdateGroupViewSet(
             if len(data["users"]) > 0:
                 for user in users:
                     u = User.objects.get(id=user)
-                    if not u in g.users.all():
+                    if u not in g.users.all():
                         g.users.add(u)
-        serilizer = UpdateGroupSerializer(g)
-        return Response(serilizer.data)
+        serializer = UpdateGroupSerializer(g)
+        return Response(serializer.data)
 
 class AddUserFromGroupView(
     mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
@@ -189,7 +188,6 @@ class AddUserFromGroupView(
     queryset = Group.objects.all()
     serializer_class = UpdateGroupSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsGroupOwnerMemberOrReadOnly]
     lookup_field = "id"
     lookup_url_kwarg = "id"
@@ -201,10 +199,10 @@ class AddUserFromGroupView(
         g = Group.objects.get(id=obj.id)
         user = data["user"]
         u = User.objects.get(id=user)
-        if not u in g.users.all():
+        if u not in g.users.all():
             g.users.add(u)
-        serilizer = UpdateGroupSerializer(g)
-        return Response(serilizer.data)
+        serializer = UpdateGroupSerializer(g)
+        return Response(serializer.data)
 
 
 class RemoveUserFromGroupView(
@@ -217,7 +215,6 @@ class RemoveUserFromGroupView(
     queryset = Group.objects.all()
     serializer_class = UpdateGroupSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsGroupOwnerMemberOrReadOnly]
     lookup_field = "id"
     lookup_url_kwarg = "id"
@@ -231,12 +228,15 @@ class RemoveUserFromGroupView(
         u = User.objects.get(id=user)
         if len(g.users.all()) > 1:
             g.users.remove(u)
-            serilizer = UpdateGroupSerializer(g)
-            return Response(serilizer.data)
+            serializer = UpdateGroupSerializer(g)
+            return Response(serializer.data)
         else:
             return Response(
                 {
-                    "detail": "Not allowed to remove the last user in the group. Add another user to the group and retry for this user."
+                    "detail": (
+                        "Not allowed to remove the last user in the group. "
+                        "Add another user to the group and retry for this user."
+                    )
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
@@ -253,7 +253,6 @@ class RemoveCustomQuestionFromGroupView(
     queryset = Group.objects.all()
     serializer_class = UpdateGroupSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsGroupOwnerMemberOrReadOnly]
     lookup_field = "id"
     lookup_url_kwarg = "id"
@@ -273,8 +272,8 @@ class RemoveCustomQuestionFromGroupView(
                     if question.id == int(resp["question_id"]):
                         media.extra_group_response.remove(resp)
                     media.save()
-        serilizer = UpdateGroupSerializer(g)
-        return Response(serilizer.data)
+        serializer = UpdateGroupSerializer(g)
+        return Response(serializer.data)
 
 
 class AddCustomQuestionFromGroupView(
@@ -284,7 +283,6 @@ class AddCustomQuestionFromGroupView(
     queryset = Group.objects.all()
     serializer_class = UpdateGroupSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsGroupOwnerMemberOrReadOnly]
     lookup_field = "id"
     lookup_url_kwarg = "id"
@@ -310,15 +308,13 @@ class AddCustomQuestionFromGroupView(
                         "question": question.question,
                         "question_type": question.question_type,
                         "question_mandatory": question.question_mandatory,
-                        "response": data["default_value"]
-                        if "default_value" in data
-                        else "",
+                        "response": data.get("default_value", ""),
                     }
                 )
                 media.save()
 
-        serilizer = UpdateGroupSerializer(g)
-        return Response(serilizer.data)
+        serializer = UpdateGroupSerializer(g)
+        return Response(serializer.data)
 
 
 class UpdateCustomQuestionFromGroupView(
@@ -328,7 +324,6 @@ class UpdateCustomQuestionFromGroupView(
     queryset = Group.objects.all()
     serializer_class = UpdateGroupSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsGroupOwnerMemberOrReadOnly]
     lookup_field = "id"
     lookup_url_kwarg = "id"
@@ -354,8 +349,8 @@ class UpdateCustomQuestionFromGroupView(
                 if q.id == int(resp["question_id"]):
                     resp["question"] = q.question
                 media.save()
-        serilizer = UpdateGroupSerializer(g)
-        return Response(serilizer.data)
+        serializer = UpdateGroupSerializer(g)
+        return Response(serializer.data)
 
 
 class InstanceGroupStats(viewsets.GenericViewSet, generics.ListAPIView):
@@ -363,7 +358,6 @@ class InstanceGroupStats(viewsets.GenericViewSet, generics.ListAPIView):
     queryset = Group.objects.all()
     serializer_class = GroupStatsSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsSuperUser]
 
     def get_paginated_response(self, data):
@@ -384,7 +378,6 @@ class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
     queryset = Group.objects.all()
     serializer_class = GroupStatsSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsGroupOwnerMemberOrReadOnly]
     lookup_field = "id"
     lookup_url_kwarg = "id"
@@ -393,7 +386,7 @@ class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
         return Response(data)
 
     def retrieve(self, request, *args, **kwargs):
-        group_id = self.kwargs["id"] if "id" in self.kwargs else None
+        group_id = self.kwargs.get("id")
         if group_id:
             media_tags_count = (
                 MediaStore.objects.filter(group=group_id)
@@ -403,10 +396,14 @@ class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
                 .annotate(id=F("tags__id"))
                 .annotate(tag_in=Value("media"))
                 .annotate(category=Value(0))
-                .values("id", "name", "symbolSize","tag_in","category")
+                .values("id", "name", "symbolSize", "tag_in", "category")
             )
             annotation_tags_count = (
-                Annotation.objects.filter(media_reference_id__in=list(MediaStore.objects.filter(group=group_id)))
+                Annotation.objects.filter(
+                    media_reference_id__in=list(
+                        MediaStore.objects.filter(group=group_id)
+                    )
+                )
                 .values("tags")
                 .annotate(symbolSize=Count("tags"))
                 .annotate(name=F('tags__name'))
@@ -414,35 +411,39 @@ class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
                 .annotate(tag_in=Value("annotation"))
                 .annotate(value=Value(1))
                 .annotate(category=Value(1))
-                .values("id", "name", "symbolSize","tag_in","category")
+                .values("id", "name", "symbolSize", "tag_in", "category")
             )
-            
-            tags_count = get_final_tags_count(list(media_tags_count),list(annotation_tags_count))
-            
+
+            tags_count = get_final_tags_count(
+                list(media_tags_count), list(annotation_tags_count)
+            )
+
             ## Now generate the links
             links = []
             for tc in tags_count:
                 tcid = tc["id"]
-                links += get_related_tags(group_id,tcid,links)
-            return Response({'nodes':tags_count,"links": links,"categories":[{"name":"Media"},{"name":"Annotation"},{"name":"Media+Annotation"}]})
-'''
-@api_view(['GET'])
-@renderer_classes([StaticHTMLRenderer])
-def simple_html_view(request):
-    data = '<html><body><h1>hello world</h1></body></html>'
-    return Response(data) '''
-    
+                links += get_related_tags(group_id, tcid, links)
+            return Response({
+                "nodes": tags_count,
+                "links": links,
+                "categories": [
+                    {"name": "Media"},
+                    {"name": "Annotation"},
+                    {"name": "Media+Annotation"},
+                ],
+            })
+
+
 class RedirectToUIView(generics.GenericAPIView):
     renderer_classes = [TemplateHTMLRenderer]
     permission_classes = [AllowAny]
-    
-    def get(self,request,*args,**kwargs):
-        print(request.path)
-        return redirect("/ui"+request.path)
+
+    def get(self, request, *args, **kwargs):
+        return redirect("/ui" + request.path)
 
 
 class HealthCheck(generics.GenericAPIView):
     permission_classes = [AllowAny]
-    
-    def get(self,request,*args,**kwargs):
+
+    def get(self, request, *args, **kwargs):
         return Response(status=200)

@@ -10,5 +10,8 @@ pytest-randomly==3.15.0    # randomise test order to catch order-dependence
 # Fixtures
 factory-boy==3.3.1
 
+# Async test support
+pytest-asyncio==0.24.0
+
 # HTTP mocking
 responses==0.25.3

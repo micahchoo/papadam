@@ -1,31 +1,23 @@
 from datetime import timedelta
 
-from django.db.models import CharField, Count, Q
-from django.db.models.functions import Cast, TruncDate
-from django.shortcuts import render
+from django.db.models import Count, Q
+from django.db.models.functions import TruncDate
 from rest_framework import generics, mixins, status, viewsets
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import (
-    AllowAny,
-    IsAuthenticated,
-    IsAuthenticatedOrReadOnly,
-)
 from rest_framework.response import Response
 
 from papadapi.annotate.permissions import (
     IsAnnotateCreateOrReadOnly,
     IsAnnotateUpdateOrReadOnly,
 )
-from papadapi.annotate.tasks import delete_annotate_post_schedule
 from papadapi.archive.models import MediaStore
-from papadapi.archive.serializers import CreateMediaStoreSerializer
-from papadapi.common.functions import recalculate_tag_count, create_or_update_tag
+from papadapi.common.functions import create_or_update_tag, recalculate_tag_count
 from papadapi.common.models import Group, Tags
 from papadapi.common.serializers import CustomPageNumberPagination
+from papadapi.queue import enqueue_after
 from papadapi.users.permissions import IsSuperUser
 
 from .models import Annotation
-from .serializers import AnnotationSerializer, AnnotationStatsSerializer, TagsSerializer
+from .serializers import AnnotationSerializer, AnnotationStatsSerializer
 
 
 class AnnotationCreateSet(
@@ -37,26 +29,24 @@ class AnnotationCreateSet(
 
     queryset = Annotation.objects.filter(is_delete=False)
     serializer_class = AnnotationSerializer
-    # pagination_class = CustomPageNumberPagination
     permission_classes = [IsAnnotateCreateOrReadOnly]
-    authentication_classes = [TokenAuthentication]
 
     def get_queryset(self):
         query = None
-        search_query = self.request.GET.get("search") 
-        search_where = self.request.GET.get("searchWhere",None)
-        search_from = self.request.GET.get("searchFrom",None)
-        search_collections = self.request.GET.get("searchCollections",None)
+        search_query = self.request.GET.get("search")
+        search_where = self.request.GET.get("searchWhere", None)
+        search_from = self.request.GET.get("searchFrom", None)
+        search_collections = self.request.GET.get("searchCollections", None)
         final_query = None
         group_query = None
-        
-        # By default search in name and description unless overridden for name or description or tags
+
+        # By default search in name and description unless overridden
         if search_query:
             if search_where == "name":
                 query = Q(annotation_text__icontains=search_query)
             elif search_where == "tags":
                 query = Q(tags__name__in=search_query)
-                
+
         if self.request.user.is_anonymous:
             group_query = Q(
                 group__in=Group.objects.filter(is_public=True, is_active=True)
@@ -68,22 +58,26 @@ class AnnotationCreateSet(
                 ) | Q(group__in=Group.objects.filter(users__in=[self.request.user]))
 
             elif search_from == "my_collections":
-                group_query = Q(group__in=Group.objects.filter(users__in=[self.request.user]))
+                group_query = Q(
+                    group__in=Group.objects.filter(users__in=[self.request.user])
+                )
             elif search_from == "public":
                 group_query = Q(
                     group__in=Group.objects.filter(is_public=True, is_active=True)
                 )
-            elif search_from == "selected_collections" and search_collections is not None:
+            elif (
+                search_from == "selected_collections"
+                and search_collections is not None
+            ):
                 group_list = search_collections.split(",")
                 group_query = Q(mediagroup__in=Group.objects.filter(id__in=group_list))
             else:
                 error_message = "No results found for the given search criteria."
-                return Response({"detail": error_message}, status=status.HTTP_404_NOT_FOUND)
-                
-        if query:
-            final_query = query & group_query
-        else:
-            final_query = group_query
+                return Response(
+                    {"detail": error_message}, status=status.HTTP_404_NOT_FOUND
+                )
+
+        final_query = query & group_query if query else group_query
         if final_query:
             return (
                 Annotation.objects.filter(query & Q(is_delete=False))
@@ -92,7 +86,7 @@ class AnnotationCreateSet(
             )
         else:
             return None
-        
+
     def create(self, request, *args, **kwargs):
         data = request.data
         files = request.FILES.get("annotation_image", None)
@@ -116,7 +110,10 @@ class AnnotationCreateSet(
         return Response(serializer.data)
 
 class AnnotationRetreiveSet(
-    mixins.RetrieveModelMixin,mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
 ):
 
     """
@@ -126,7 +123,6 @@ class AnnotationRetreiveSet(
     queryset = Annotation.objects.filter(is_delete=False)
     serializer_class = AnnotationSerializer
     permission_classes = [IsAnnotateUpdateOrReadOnly]
-    authentication_classes = [TokenAuthentication]
     pagination_class = CustomPageNumberPagination
 
     lookup_field = "uuid"
@@ -143,7 +139,7 @@ class AnnotationRetreiveSet(
     def update(self, request, *args, **kwargs):
         data = request.data
         files = request.FILES.get("annotation_image", None)
-        
+
         obj = self.get_object()
         m = Annotation.objects.get(id=obj.id)
         if "annotation_text" in data:
@@ -160,7 +156,7 @@ class AnnotationRetreiveSet(
             m.annotation_image = files
         m.save()
         serializer = AnnotationSerializer(m)
-        return Response(serializer.data,status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -174,10 +170,12 @@ class AnnotationRetreiveSet(
         m.save()
         media = MediaStore.objects.get(uuid=m.media_reference_id)
         if media.group.delete_wait_for == 0:
-            delete_annotate_post_schedule.schedule((m.id,), delay=10)
+            enqueue_after("delete_annotate_post_schedule", m.id, delay=10)
         else:
-            delete_annotate_post_schedule.schedule(
-                (m.id,), delay=timedelta(days=media.group.delete_wait_for)
+            enqueue_after(
+                "delete_annotate_post_schedule",
+                m.id,
+                delay=timedelta(days=media.group.delete_wait_for),
             )
 
 class AnnotationAddTag(
@@ -191,7 +189,6 @@ class AnnotationAddTag(
     queryset = Annotation.objects.filter(is_delete=False)
     serializer_class = AnnotationSerializer
     permission_classes = [IsAnnotateUpdateOrReadOnly]
-    authentication_classes = [TokenAuthentication]
     pagination_class = CustomPageNumberPagination
 
     lookup_field = "uuid"
@@ -208,7 +205,7 @@ class AnnotationAddTag(
         obj = self.get_object()
         m = Annotation.objects.get(id=obj.id)
 
-        tags = data["tags"] if "tags" in data else None
+        tags = data.get("tags")
         if tags:
             for tag in tags:
                 m.tags.add(create_or_update_tag(tag))
@@ -227,7 +224,6 @@ class AnnotationRemoveTag(
     queryset = Annotation.objects.filter(is_delete=False)
     serializer_class = AnnotationSerializer
     permission_classes = [IsAnnotateUpdateOrReadOnly]
-    authentication_classes = [TokenAuthentication]
     pagination_class = CustomPageNumberPagination
 
     lookup_field = "uuid"
@@ -244,7 +240,7 @@ class AnnotationRemoveTag(
         obj = self.get_object()
         m = Annotation.objects.get(id=obj.id)
 
-        tags = data["tags"] if "tags" in data else None
+        tags = data.get("tags")
         if tags:
             for tag_id in tags:
                 t = Tags.objects.get(id=tag_id)
@@ -252,8 +248,6 @@ class AnnotationRemoveTag(
                 recalculate_tag_count(t)
         serializer = AnnotationSerializer(m)
         return Response(serializer.data)
-
-
 
 
 class AnnotationByMediaRetreiveSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -270,29 +264,18 @@ class AnnotationByMediaRetreiveSet(mixins.RetrieveModelMixin, viewsets.GenericVi
     lookup_url_kwarg = "uuid"
 
     def retrieve(self, request, *args, **kwargs):
-        # serializer = self.get_serializer(self.get_queryset(), many=True)
         media_id = self.kwargs["uuid"]
         queryset = Annotation.objects.filter(
             is_delete=False, media_reference_id=media_id
         )
         serializer = AnnotationSerializer(queryset, many=True)
-        return Response(data=serializer.data,status=status.HTTP_200_OK)
-
-    def retrieve(self, request, *args, **kwargs):
-        # serializer = self.get_serializer(self.get_queryset(), many=True)
-        media_id = self.kwargs["uuid"]
-        queryset = Annotation.objects.filter(
-            is_delete=False, media_reference_id=media_id
-        )
-        serializer = AnnotationSerializer(queryset, many=True)
-        return Response(data=serializer.data,status=status.HTTP_200_OK)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
 
 
 class InstanceAnnotationStats(viewsets.GenericViewSet, generics.ListAPIView):
 
     queryset = Annotation.objects.all()
     serializer_class = AnnotationStatsSerializer
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsSuperUser]
     pagination_class = CustomPageNumberPagination
 
@@ -317,13 +300,12 @@ class GroupAnnotationStats(
     queryset = Annotation.objects.all()
     serializer_class = AnnotationStatsSerializer
     pagination_class = CustomPageNumberPagination
-    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAnnotateCreateOrReadOnly]
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
     def retrieve(self, request, *args, **kwargs):
-        group_id = self.kwargs["id"] if "id" in self.kwargs else None
+        group_id = self.kwargs.get("id")
         if group_id:
 
             base_data = MediaStore.objects.filter(

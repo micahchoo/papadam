@@ -1,31 +1,38 @@
+"""
+importexport/tasks.py — ARQ background tasks for the importexport app.
+
+The export/import business logic is synchronous (heavy file I/O, Django ORM
+queries, tarfile operations).  Each ARQ task wraps its sync body in
+asyncio.to_thread so the worker event-loop is not blocked.
+"""
+
+from __future__ import annotations
+
+import asyncio
 import json
 import os
 import tarfile
 import uuid
 
 import requests
-from django.core.files import File
-from django.core.files.storage import default_storage
-from django.shortcuts import get_object_or_404
 import structlog
-
-from papadapi.tasks_compat import db_task
-
-log = structlog.get_logger(__name__)
+from django.core.files import File
 
 from papadapi.annotate.models import Annotation
 from papadapi.archive.models import MediaStore
 from papadapi.common.models import Group, Tags
 from papadapi.importexport.models import IERequest
 
+log = structlog.get_logger(__name__)
+
+
+# ── sync helpers (unchanged from legacy — violations are pre-existing debt) ───
+
 
 def download(url, file_name, files_path):
-    # open in binary mode
     file_name = file_name.split("/")[1]
     with open(os.path.join(files_path, file_name), "wb") as file:
-        # get request
-        response = requests.get(url)
-        # write to file
+        response = requests.get(url)  # noqa: S113
         file.write(response.content)
     return file_name
 
@@ -40,7 +47,6 @@ def export_annotation(files_path, annotation):
     for tags in annotation.tags.all():
         annotation_tags += tags.name + ","
     annotation_data[str(annotation.uuid)]["tags"] = annotation_tags
-    # Annotation Image
     if annotation.annotation_image:
         annotation_file = download(
             annotation.annotation_image.url,
@@ -70,7 +76,6 @@ def export_media(files_path, media_instance):
     annotations = Annotation.objects.filter(
         is_delete=False, media_reference_id=media_instance.uuid
     )
-    # If annotation lenght there
     if len(annotations) > 0:
         media_data["annotations"] = {}
         for annotation in annotations:
@@ -83,54 +88,53 @@ def export_media(files_path, media_instance):
 
 def import_annotation(files_path, annovals, media):
     annotation_file_name = os.path.join(files_path, annovals["annotation_image"])
-    annotation = Annotation.objects.create(
-        annotation_text=annovals["annotation_text"],
-        media_target=annovals["media_target"],
-        media_reference_id=str(media.uuid),
-        annotation_image=File(file=open(annotation_file_name, "rb")),
-    )
+    with open(annotation_file_name, "rb") as f:
+        Annotation.objects.create(
+            annotation_text=annovals["annotation_text"],
+            media_target=annovals["media_target"],
+            media_reference_id=str(media.uuid),
+            annotation_image=File(file=f),
+        )
     return True
 
 
 def import_media(files_path, media_data, group):
     media_file_name = os.path.join(files_path, media_data["media_file_name"])
-    media = MediaStore.objects.create(
-        name=media_data["name"],
-        description=media_data["description"],
-        uuid=uuid.uuid4(),
-        group=group,
-        upload=File(file=open(media_file_name, "rb")),
-    )
+    with open(media_file_name, "rb") as f:
+        media = MediaStore.objects.create(
+            name=media_data["name"],
+            description=media_data["description"],
+            uuid=uuid.uuid4(),
+            group=group,
+            upload=File(file=f),
+        )
     for tag in media_data["tags"].split(","):
         tag_obj = Tags.objects.filter(name=tag).first()
         if not tag_obj:
             tag_obj = Tags.objects.create(name=tag)
         media.tags.add(tag_obj)
-    # Add annotaions if exists
     if "annotations" in media_data:
-        for annotation_id, annovals in media_data["annotations"].items():
+        for annovals in media_data["annotations"].values():
             import_annotation(files_path, annovals, media)
-
     return True
 
 
 def extract_json_for_import(files_path, import_data):
     jsondata = {}
     tarfilename = download(import_data.url, import_data.name, files_path)
-    # tarfilename = os.path.join(files_path,filename)
     if tarfile.is_tarfile(tarfilename):
         with tarfile.open(tarfilename, "r") as file_obj:
-            file_obj.extractall()
-
-        jsondata = json.load(open("data.json"))
-        if jsondata:
-            return jsondata
-        else:
-            return False
+            file_obj.extractall()  # noqa: S202
+        with open("data.json") as f:
+            jsondata = json.load(f)
+        return jsondata or False
+    return False
 
 
-@db_task()
-def export_request_task(request_id):
+# ── sync task bodies ──────────────────────────────────────────────────────────
+
+
+def _export_sync(request_id: int) -> bool:
     export = IERequest.objects.get(id=request_id)
     export_metadata = export.ie_metadata
     requested_by = export.requested_by
@@ -154,14 +158,14 @@ def export_request_task(request_id):
             export.detail = "Requested group does not exist"
             export.save()
         if is_proceed:
-            export_data["group"] = {}
-            export_data["group"]["group_name"] = group.name
-            export_data["group"]["group_visibility"] = group.is_public
-            export_data["group"]["group_description"] = group.description
+            export_data["group"] = {
+                "group_name": group.name,
+                "group_visibility": group.is_public,
+                "group_description": group.description,
+            }
             if requested_by in group.users.all() or group.is_public:
                 media_data = {}
-                media_data_queryset = MediaStore.objects.filter(group=group)
-                for data in media_data_queryset:
+                for data in MediaStore.objects.filter(group=group):
                     data_id = str(data.uuid)
                     media_data[data_id] = {}
                     media_files, media_data[data_id] = export_media(files_path, data)
@@ -194,7 +198,10 @@ def export_request_task(request_id):
                 proceed_upload = True
             else:
                 export.is_complete = True
-                export.detail = "Not authorized to run export on the requested media, as user is not a part of the group"
+                export.detail = (
+                    "Not authorized to run export on the requested media, "
+                    "as user is not a part of the group"
+                )
                 export.save()
 
     elif export_requested_type == "annotation":
@@ -204,7 +211,6 @@ def export_request_task(request_id):
         try:
             annotation = Annotation.objects.get(uuid=annotation_id)
             is_proceed = True
-
         except Annotation.DoesNotExist:
             export.is_authorized = True
             export.is_complete = True
@@ -215,7 +221,6 @@ def export_request_task(request_id):
             group = media.group
             if requested_by in group.users.all() or group.is_public or media.is_public:
                 media_data = {}
-                # media_data["annotations"] = {}
                 media_data["annotation"] = {}
                 media_files, media_data["annotation"] = export_annotation(
                     files_path, annotation
@@ -225,9 +230,11 @@ def export_request_task(request_id):
                 proceed_upload = True
             else:
                 export.is_complete = True
-                export.detail = "Not authorized to run export on the requested annotation, as user is not a part of the group"
+                export.detail = (
+                    "Not authorized to run export on the requested annotation, "
+                    "as user is not a part of the group"
+                )
                 export.save()
-
     else:
         export.is_complete = True
         export.detail = "Unknown request. Not doing anything"
@@ -240,26 +247,17 @@ def export_request_task(request_id):
         with open("data.json", "w") as outfile:
             json.dump(export_data, outfile)
 
-        # Create a tar file
-        fileobj = tarfile.open(request_uuid + ".tar", "w")
-        fileobj.add("data.json")
-        fileobj.list()
-        # Now add the media also
-        if len(media_file_list) > 0:
+        with tarfile.open(request_uuid + ".tar", "w") as fileobj:
+            fileobj.add("data.json")
+            fileobj.list()
             for mfl in media_file_list:
-                if (
-                    mfl is not None
-                ):  # TODO: Not sure why, but some rare cases, there is an empty None that gets added. This is explict handling, but identifying and patching the root cause needs to be done.
+                if mfl is not None:
                     fileobj.add(mfl)
-        fileobj.close()
 
-        # Upload the created file
-        fp = open(request_uuid + ".tar", "rb")
-        export.requested_file.save(request_uuid + ".tar", File(fp))
-        fp.close()
+        with open(request_uuid + ".tar", "rb") as fp:
+            export.requested_file.save(request_uuid + ".tar", File(fp))
         os.chdir(cwd)
 
-        # Other metadata update and save.
         export.is_authorized = True
         export.is_complete = True
         export.detail = "Request completed"
@@ -267,8 +265,7 @@ def export_request_task(request_id):
     return True
 
 
-@db_task()
-def import_request_task(request_id):
+def _import_sync(request_id: int) -> bool:
     importreq = IERequest.objects.get(id=request_id)
     importreq_metadata = json.loads(importreq.ie_metadata)
     requested_by = importreq.requested_by
@@ -279,10 +276,10 @@ def import_request_task(request_id):
         os.makedirs(files_path, exist_ok=True)
     cwd = os.getcwd()
     os.chdir(files_path)
+
     if importreq_requested_type == "group":
         jsonfile = extract_json_for_import(files_path, importreq.requested_file)
         if jsonfile:
-            # Create Group
             group_details = jsonfile["group"]
             group_name = (
                 importreq_metadata["name"]
@@ -309,14 +306,13 @@ def import_request_task(request_id):
             group.delete_wait_for = 7
             group.save()
 
-            # Upload all media
             media_details = jsonfile["archive"]
-            for id, media_data in media_details.items():
+            for media_data in media_details.values():
                 import_media(files_path, media_data, group)
         else:
-            export.is_complete = True
-            export.detail = "Upload data corrupt. Unable to import"
-            export.save()
+            importreq.is_complete = True
+            importreq.detail = "Upload data corrupt. Unable to import"
+            importreq.save()
 
     elif importreq_requested_type == "archive":
         group_into = importreq_metadata["import_into_group"]
@@ -325,12 +321,13 @@ def import_request_task(request_id):
             jsonfile = extract_json_for_import(files_path, importreq.requested_file)
             if jsonfile:
                 media_details = jsonfile["archive"]
-                for id, media_data in media_details.items():
+                for media_data in media_details.values():
                     import_media(files_path, media_data, group)
             else:
-                export.is_complete = True
-                export.detail = "Upload data corrupt. Unable to import"
-                export.save()
+                importreq.is_complete = True
+                importreq.detail = "Upload data corrupt. Unable to import"
+                importreq.save()
+
     elif importreq_requested_type == "annotation":
         media_into = importreq_metadata["import_for_media"]
         media = MediaStore.objects.get(uuid=media_into)
@@ -339,17 +336,32 @@ def import_request_task(request_id):
             jsonfile = extract_json_for_import(files_path, importreq.requested_file)
             if jsonfile:
                 annotation_details = jsonfile["archive"]["annotation"]
-                for (
-                    annotation_detail
-                ) in annotation_details.values():  # Mind the singular and plural here.
+                for annotation_detail in annotation_details.values():
                     import_annotation(files_path, annotation_detail, media)
             else:
-                export.is_complete = True
-                export.detail = "Upload data corrupt. Unable to import"
-                export.save()
+                importreq.is_complete = True
+                importreq.detail = "Upload data corrupt. Unable to import"
+                importreq.save()
         else:
-            export.is_complete = True
-            export.detail = "Not authorized to run import on the requested media, as user is not a part of the group"
-            export.save()
+            importreq.is_complete = True
+            importreq.detail = (
+                "Not authorized to run import on the requested media, "
+                "as user is not a part of the group"
+            )
+            importreq.save()
+
     os.chdir(cwd)
     return True
+
+
+# ── ARQ async task entry-points ───────────────────────────────────────────────
+
+
+async def export_request_task(ctx: dict, request_id: int) -> bool:
+    """ARQ task: run export business logic in a thread pool."""
+    return await asyncio.to_thread(_export_sync, request_id)
+
+
+async def import_request_task(ctx: dict, request_id: int) -> bool:
+    """ARQ task: run import business logic in a thread pool."""
+    return await asyncio.to_thread(_import_sync, request_id)

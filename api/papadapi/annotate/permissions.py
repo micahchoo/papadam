@@ -1,7 +1,9 @@
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from papadapi.archive.models import MediaStore
-from papadapi.common.models import Group
+
+_MEMBERSHIP_MSG = "User does not belong to the group. Cannot modify any data."
+
 
 class IsAnnotateCreateOrReadOnly(BasePermission):
     message = "You are not a member of the group to perform this action"
@@ -20,7 +22,7 @@ class IsAnnotateCreateOrReadOnly(BasePermission):
         else:
             archive_id = data["media_reference_id"]
         if archive_id == "annotate" and request.method in SAFE_METHODS:
-            return True 
+            return True
         else:
             archive = MediaStore.objects.get(uuid=archive_id)
             group = None
@@ -34,7 +36,7 @@ class IsAnnotateCreateOrReadOnly(BasePermission):
                     if user in group.users.all():
                         return True
                     else:
-                        self.message = "User does not belong to the group. Cannot modify any data."
+                        self.message = _MEMBERSHIP_MSG
                         return False
             else:
                 self.message = "User or Group detail missing"
@@ -52,7 +54,7 @@ class IsAnnotateUpdateOrReadOnly(BasePermission):
             if user in group.users.all():
                 return True
             else:
-                self.message = "User does not belong to the group. Cannot modify any data."
+                self.message = _MEMBERSHIP_MSG
                 return False
         else:
             self.message = "User or Group detail missing"

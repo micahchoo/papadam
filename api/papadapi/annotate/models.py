@@ -1,23 +1,22 @@
 import hashlib
 import json
+import logging
 import os
 import uuid
 from functools import partial
-import logging
-
-logger = logging.getLogger(__name__)
 
 from django.db import models
+from django.urls import reverse
 from django.utils.translation import gettext as _
-from django.shortcuts import get_object_or_404
-
 from djrichtextfield.models import RichTextField
 
 from papadapi.archive.models import MediaStore
 
+logger = logging.getLogger(__name__)
+
 
 def hash_file(file, block_size=65536):
-    hasher = hashlib.md5()
+    hasher = hashlib.md5(usedforsecurity=False)
     for buf in iter(partial(file.read, block_size), b""):
         hasher.update(buf)
     return hasher.hexdigest()
@@ -28,12 +27,19 @@ def upload_to(instance, filename):
     :type instance: dolphin.models.File
     """
     instance.annotation_image.open()
-    filename_base, filename_ext = os.path.splitext(filename)
+    _, filename_ext = os.path.splitext(filename)
 
-    return "annotate/{}{}".format(hash_file(instance.annotation_image), filename_ext)
+    return f"annotate/{hash_file(instance.annotation_image)}{filename_ext}"
 
 
 class Annotation(models.Model):
+
+    class AnnotationType(models.TextChoices):
+        TEXT = "text", _("Text")
+        IMAGE = "image", _("Image")
+        AUDIO = "audio", _("Audio")
+        VIDEO = "video", _("Video")
+        MEDIA_REF = "media_ref", _("Media Reference")
 
     media_reference_id = models.URLField(_("Media Reference URL"), max_length=500)
     media_target = models.CharField(
@@ -51,7 +57,32 @@ class Annotation(models.Model):
     is_instance_admin_withheld = models.BooleanField(
         _("withheld by instance admin?"), default=False
     )
-    group = models.ForeignKey("common.Group", verbose_name=_("Group"), on_delete=models.CASCADE,blank=True, null=True)
+    group = models.ForeignKey(
+        "common.Group",
+        verbose_name=_("Group"),
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    annotation_type = models.CharField(
+        _("Annotation type"),
+        max_length=20,
+        choices=AnnotationType.choices,
+        default=AnnotationType.TEXT,
+    )
+    reply_to = models.ForeignKey(
+        "self",
+        verbose_name=_("Reply to annotation"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="replies",
+    )
+    media_ref_uuid = models.UUIDField(
+        _("Referenced media UUID"),
+        null=True,
+        blank=True,
+    )
     is_instance_group_withheld = models.BooleanField(
         _("withheld by group admin?"), default=False
     )
@@ -83,12 +114,12 @@ class Annotation(models.Model):
         except MediaStore.DoesNotExist as e:
             logger.error(f"MediaStore not found: {e}")
             return None
-            
+
     def save(self, *args, **kwargs):
         if not self.group:
             self.group = self.compute_group_id()
-        super(Annotation, self).save(*args, **kwargs)
-    
+        super().save(*args, **kwargs)
+
     def annotation_structure(self, media_id):
         "Returns every object in annotation structure"
         data = Annotation.objects.filter(media_reference_id=media_id)
@@ -99,7 +130,7 @@ class Annotation(models.Model):
             ref_json = {}  # Referece json
             a_struct = {}  # Annotation response json
 
-            # This ensures we define the structure of the sample json as per our annotation structure
+            # Load the reference annotation structure template
             with open("./papadapi/annotate/annotation_structure.json") as f:
                 ref_json = json.loads(f.read())
 
@@ -131,84 +162,3 @@ class Annotation(models.Model):
         resp["next"] = "null"
         resp["results"] = resp_data
         return resp
-
-
-"""
-Current Reference Annotation in implementation
-    {
-        "_id": {
-            "$oid": "61c6e6ebb29dd438402f79f5"
-        },
-        "target": {
-            "id": "https://maya-spano-files.test.openrun.net/cc2b32a1b89138bc3dbe760412cb70db98c9a47f90d52b8a8e4fe1f6b78b8f24.oga#t=22.5,37",
-            "format": "oga",
-            "src": "cc2b32a1b89138bc3dbe760412cb70db98c9a47f90d52b8a8e4fe1f6b78b8f24.oga"
-        },
-        "body": {
-            "tags": "#bloodtest #cholestrol #diagnosis",
-            "imgTags": "",
-            "text": "Doctor does bloodtest and high cholestrol shows up",
-            "purpose": "tagging",
-            "station_name": "Maya"
-        },
-        "selector": {
-            "value": "t=22.5,37",
-            "type": "FragmentSelector",
-            "conformsTo": "http://www.w3.org/TR/media-frags/"
-        },
-        "creator": "anonymous cat"
-    }
-
-    The new  annotator resposnse will be as below, following standards from : https://www.w3.org/TR/annotation-model/
-
-    {
-    	"@context": "http://www.w3.org/ns/anno.jsonld",
-    	"id": "http://example.org/anno3",# Refer IRI, should be a combination of alpha-neumeric and non-octects
-    	"type": "Annotation",
-    	"creator": {
-    		"id": "http://example.org/user1",
-    		"type": "Person",
-    		"name": "My Pseudonym"
-    	},
-    	"motivation": "annotating",
-    	"created": "2015-01-28T12:00:00Z",
-    	"modified": "2015-01-29T09:00:00Z",
-    	"canonical": "urn:uuid:dbfb1861-0ecf-41ad-be94-a584e5c4f1df",
-    	"via": "http://other.example.org/anno1",# ensures federation eventually. But currently the same url as the host url
-    	"body": [{
-    			"id": "Annotation id url ",
-    			"type": "TextualBody",
-    			"value": "#1, #2",
-    			"purpose": "tagging",
-    			"created": "2014-06-02T17:00:00Z"
-    		},
-    		{
-    			"type": "Choice",
-    			"items": [{
-    					"id": "Annotation id url ",
-    					"type": "TextualBody",
-    					"value": "The written description comes here",
-    					"purpose": "describing",
-    					"created": "2014-06-02T17:00:00Z"
-    				},
-    				{
-    					"id": "Annotation media url ",
-    					"type": "Image",
-    					"purpose": "describing",
-    					"created": "2014-06-02T17:00:00Z"
-    				}
-    			]
-    		}
-    	],
-
-    	"target": {
-    		"id": "https://maya-spano-files.test.openrun.net/cc2b32a1b89138bc3dbe760412cb70db98c9a47f90d52b8a8e4fe1f6b78b8f24.oga",
-    		"type": "Audio/Video",
-    		"selector": {
-    			"type": "FragmentSelector",
-    			"conformsTo": "http://www.w3.org/TR/media-frags/",
-    			"value": "t=30,60"
-    		}
-    	}
-    }
-"""

@@ -1,5 +1,4 @@
 from django.contrib import admin, messages
-from django.contrib.admin.helpers import ActionForm
 
 from papadapi.archive.models import MediaStore
 from papadapi.common.admin import BaseAdmin
@@ -21,7 +20,7 @@ class MediaStoreAdmin(BaseAdmin):
 
     @admin.action(description="Withhold selected media")
     def admin_withhold_media(self, request, queryset):
-        requested_media_list = request.POST.get("_selected_action")
+
         queryset.update(is_instance_admin_withheld=True)
         queryset.update(is_delete=True)
         self.message_user(
@@ -30,7 +29,7 @@ class MediaStoreAdmin(BaseAdmin):
 
     @admin.action(description="Unblock selected media")
     def admin_unblock_media(self, request, queryset):
-        requested_media_list = request.POST.get("_selected_action")
+
         queryset.update(is_instance_admin_withheld=False)
         queryset.update(is_delete=False)
         self.message_user(

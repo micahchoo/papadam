@@ -1,5 +1,4 @@
 from django.contrib import admin, messages
-from django.contrib.admin.helpers import ActionForm
 from django.contrib.auth.models import Group
 from rest_framework.authtoken.models import TokenProxy as DRFToken
 
@@ -20,7 +19,6 @@ class UserAdmin(BaseAdmin):
 
     @admin.action(description="Withhold selected user")
     def admin_withhold_user(self, request, queryset):
-        requested_media_list = request.POST.get("_selected_action")
         queryset.update(is_active=False)
         self.message_user(
             request, "selected User successfully withheld", messages.SUCCESS
@@ -28,7 +26,6 @@ class UserAdmin(BaseAdmin):
 
     @admin.action(description="Unblock selected user")
     def admin_unblock_user(self, request, queryset):
-        requested_media_list = request.POST.get("_selected_action")
         queryset.update(is_active=True)
         self.message_user(
             request, "selected User successfully unblocked", messages.SUCCESS

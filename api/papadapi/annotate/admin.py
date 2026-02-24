@@ -1,5 +1,4 @@
 from django.contrib import admin, messages
-from django.contrib.admin.helpers import ActionForm
 
 from papadapi.annotate.models import Annotation
 from papadapi.common.admin import BaseAdmin
@@ -21,7 +20,7 @@ class AnnotationAdmin(BaseAdmin):
 
     @admin.action(description="Withhold selected annotation")
     def admin_withhold_annotation(self, request, queryset):
-        requested_media_list = request.POST.get("_selected_action")
+
         queryset.update(is_instance_admin_withheld=True)
         queryset.update(is_delete=True)
         self.message_user(
@@ -30,7 +29,7 @@ class AnnotationAdmin(BaseAdmin):
 
     @admin.action(description="Unblock selected annotation")
     def admin_unblock_annotation(self, request, queryset):
-        requested_media_list = request.POST.get("_selected_action")
+
         queryset.update(is_instance_admin_withheld=False)
         queryset.update(is_delete=False)
         self.message_user(

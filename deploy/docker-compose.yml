@@ -134,9 +134,16 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+    environment:
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      PUBLIC_CRDT_URL: ${PUBLIC_CRDT_URL}
+    # Generate /config.json from env before handing off to caddy.
+    # The SvelteKit SPA fetches /config.json on startup to discover backend URLs.
+    entrypoint: ["/bin/sh", "-c",
+      "printf '{\"API_URL\":\"%s\",\"CRDT_URL\":\"%s\"}\\n' \"$$PUBLIC_API_URL\" \"$$PUBLIC_CRDT_URL\" > /srv/ui/config.json && exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ../ui/build:/srv/ui:ro
+      - ../ui/build:/srv/ui
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

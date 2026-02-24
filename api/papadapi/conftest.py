@@ -5,19 +5,16 @@ All tests import from here via pytest's conftest auto-discovery.
 Factories are in factories.py (same directory); this file wires them to fixtures.
 """
 
+# ── Factories (inline — move to factories.py when they grow large) ────────────
+import factory
 import pytest
+from factory.django import DjangoModelFactory
 from rest_framework.test import APIClient
 
-from papadapi.users.models import User
-from papadapi.common.models import Group, Tags
-from papadapi.archive.models import MediaStore
 from papadapi.annotate.models import Annotation
-
-
-# ── Factories (inline — move to factories.py when they grow large) ────────────
-
-import factory
-from factory.django import DjangoModelFactory
+from papadapi.archive.models import MediaStore
+from papadapi.common.models import Group, Tags
+from papadapi.users.models import User
 
 
 class UserFactory(DjangoModelFactory):
@@ -73,6 +70,9 @@ class AnnotationFactory(DjangoModelFactory):
     )
     media_target = "t=0,10"
     annotation_text = factory.Faker("sentence")
+    annotation_type = Annotation.AnnotationType.TEXT
+    reply_to = None
+    media_ref_uuid = None
     is_public = True
     group = factory.SubFactory(GroupFactory)
 

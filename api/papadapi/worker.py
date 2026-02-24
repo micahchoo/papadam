@@ -10,25 +10,32 @@ archive/tasks.py, annotate/tasks.py, and importexport/tasks.py in Phase 1c.
 
 import os
 
-import django
 import structlog
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "papadapi.config.production")
 os.environ.setdefault("DJANGO_CONFIGURATION", "Production")
 
 # Django must be set up before importing models/tasks
-import configurations  # noqa: E402
+import configurations
+
 configurations.setup()
 
 log = structlog.get_logger()
 
 
 # ── Task functions (imported after Django setup) ──────────────────────────────
-# These will be populated as tasks are migrated from Huey in Phase 1c.
-# Each task is an async function decorated with nothing — ARQ calls them directly.
 
-# from papadapi.archive.tasks import process_media, upload_to_storage
-# from papadapi.importexport.tasks import export_group, import_group
+from papadapi.annotate.tasks import delete_annotate_post_schedule  # noqa: E402
+from papadapi.archive.tasks import (  # noqa: E402
+    convert_to_hls,
+    convert_to_hls_audio,
+    delete_media_post_schedule,
+    upload_to_storage,
+)
+from papadapi.importexport.tasks import (  # noqa: E402
+    export_request_task,
+    import_request_task,
+)
 
 
 async def startup(ctx: dict) -> None:
@@ -41,7 +48,15 @@ async def shutdown(ctx: dict) -> None:
 
 class WorkerSettings:
     redis_settings_from_dsn = os.environ.get("REDIS_URL", "redis://redis:6379/0")
-    functions = []          # populated as tasks are migrated
+    functions = [
+        delete_annotate_post_schedule,
+        delete_media_post_schedule,
+        convert_to_hls,
+        convert_to_hls_audio,
+        upload_to_storage,
+        export_request_task,
+        import_request_task,
+    ]
     on_startup = startup
     on_shutdown = shutdown
     max_jobs = 4

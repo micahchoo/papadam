@@ -16,7 +16,4 @@ class IsUserOrReadOnly(permissions.BasePermission):
 
 class IsSuperUser(permissions.BasePermission):
     def has_permission(self, request, view):
-        if request.user.is_superuser:
-            return True
-        else:
-            return False
+        return bool(request.user.is_superuser)

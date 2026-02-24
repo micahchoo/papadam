@@ -1,61 +1,106 @@
-<script>
-    import { selectedMediaDuration } from '$lib/stores'; // Assuming selectedMediaDuration is a writable store
-    export let src = '';
-    export let autoplay = false;
-    export let onTimeUpdate = null;
-    export let controls = true;
+<script lang="ts">
+	import { onDestroy } from 'svelte';
+	import Hls from 'hls.js';
+	import { selectedMediaDuration, playbackPosition } from '$lib/stores';
 
-    let videoPlayer;
+	interface Props {
+		src?: string;
+		autoplay?: boolean;
+		controls?: boolean;
+	}
 
-    // This function is triggered when the video metadata is loaded
-    function setMediaDuration() {
-        if (videoPlayer && videoPlayer.duration) {
-            $selectedMediaDuration = videoPlayer.duration;  // Set the media duration in the store
-        }
-    }
+	const { src = '', autoplay = false, controls = true }: Props = $props();
 
-    // Function to play a specific snippet of the video
-    export function playSnippet(start, end) {
-        if (videoPlayer) {
-            const startTime = parseFloat(start);
-            const endTime = parseFloat(end);
+	let videoEl = $state<HTMLVideoElement | null>(null);
+	let audioEl = $state<HTMLAudioElement | null>(null);
+	let hls: Hls | null = null;
 
-            // Set the current time to the start of the snippet and play the video
-            videoPlayer.currentTime = startTime;
-            videoPlayer.play();
+	const isAudio = $derived(
+		src.startsWith('data:audio') || /\.(mp3|ogg|wav|flac|aac|m4a)(\?|$)/i.test(src)
+	);
 
-            // Stop playback after the end time
-            const stopPlayback = () => {
-                if (videoPlayer.currentTime >= endTime) {
-                    videoPlayer.pause();
-                    videoPlayer.removeEventListener('timeupdate', stopPlayback);
-                }
-            };
+	function initHls(el: HTMLMediaElement, url: string) {
+		if (hls) {
+			hls.destroy();
+			hls = null;
+		}
+		if (url.includes('.m3u8') && Hls.isSupported()) {
+			hls = new Hls({ enableWorker: false });
+			hls.loadSource(url);
+			hls.attachMedia(el);
+		} else {
+			el.src = url;
+		}
+	}
 
-            videoPlayer.addEventListener('timeupdate', stopPlayback);
-        }
-    }
+	$effect(() => {
+		const el = isAudio ? audioEl : videoEl;
+		if (el && src) initHls(el, src);
+		return () => {
+			hls?.destroy();
+			hls = null;
+		};
+	});
 
-    // Optional time update event handler
-    function handleTimeUpdate(event) {
-        if (onTimeUpdate && typeof onTimeUpdate === 'function') {
-            onTimeUpdate(event);
-        }
-    }
+	function onLoadedMetadata(e: Event) {
+		const el = e.target as HTMLMediaElement;
+		selectedMediaDuration.set(el.duration);
+	}
+
+	function onTimeUpdate(e: Event) {
+		const el = e.target as HTMLMediaElement;
+		playbackPosition.set(el.currentTime);
+	}
+
+	/** Play a specific time range. Called by parent route component. */
+	export function playSnippet(start: number, end: number): void {
+		const el = isAudio ? audioEl : videoEl;
+		if (!el) return;
+		el.currentTime = start;
+		void el.play();
+		const stop = () => {
+			if (el.currentTime >= end) {
+				el.pause();
+				el.removeEventListener('timeupdate', stop);
+			}
+		};
+		el.addEventListener('timeupdate', stop);
+	}
+
+	onDestroy(() => {
+		hls?.destroy();
+	});
 </script>
 
-<div class="media-player-container pb-5 ">
-    {#if src}
-        <video 
-            bind:this={videoPlayer} 
-            {controls} 
-            {autoplay} 
-            class=" h-full w-full bg-black" 
-            src={src}
-            on:loadedmetadata={setMediaDuration} >
-            Your browser does not support the video tag.
-        </video>
-    {:else}
-        <video controls class=" w-full bg-black"></video>
-    {/if}
+<div class="media-player-container pb-5">
+	{#if src}
+		{#if isAudio}
+			<audio
+				bind:this={audioEl}
+				{controls}
+				{autoplay}
+				class="w-full"
+				onloadedmetadata={onLoadedMetadata}
+				ontimeupdate={onTimeUpdate}
+			>
+				Your browser does not support the audio element.
+			</audio>
+		{:else}
+			<video
+				bind:this={videoEl}
+				{controls}
+				{autoplay}
+				class="h-full w-full bg-black"
+				onloadedmetadata={onLoadedMetadata}
+				ontimeupdate={onTimeUpdate}
+			>
+				<track kind="captions" src="" label="Captions" />
+				Your browser does not support the video element.
+			</video>
+		{/if}
+	{:else}
+		<video {controls} class="w-full bg-black"
+			><track kind="captions" src="" label="Captions" /></video
+		>
+	{/if}
 </div>

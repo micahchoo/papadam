@@ -137,22 +137,24 @@ The dependency direction between Django apps is a contract, not a convention.
 ### Allowed dependency graph
 
 ```
-common  ←────────────────────────────── (leaf, no internal imports)
+common  ←────────────────────────────── new code: no imports from other apps
+  ↑                                     legacy debt: functions/serializers/views import
+  │                                     archive, annotate, users — exempted in contracts
+users   ←────────────────────────────── may not import from archive or above
   ↑
-users   ←────────────────────────────── may import: common
-  ↑
-archive ←────────────────────────────── may import: common, users
-  ↑
-annotate ←───────────────────────────── may import: common, users, archive
+archive ←────────────────────────────── may not import from importexport or new apps
+  ↑                                     legacy debt: serializers import annotate — exempted
+annotate ←───────────────────────────── may not import from importexport or new apps
   ↑              ↑
 exhibit          media_relation ───────  may import: common, users, archive, annotate
-  ↑
 crdt    ←────────────────────────────── may import: common, archive, annotate
 events  ←────────────────────────────── may import: common only
 importexport ←───────────────────────── may import: common, users, archive, annotate
+queue   ←────────────────────────────── leaf — may not import from any app
 ```
 
-No app may import from a layer above it. No circular imports anywhere.
+New apps strictly enforce the graph. Legacy apps (`common`, `archive`) have pre-existing
+cross-imports documented as `ignore_imports` in the contracts — these violations must not grow.
 Contracts live in `api/pyproject.toml` under `[tool.importlinter]`.
 
 ### Frontend architecture (eslint-boundaries)
@@ -423,9 +425,9 @@ Violations fail `npm run lint` and the CI lint step.
 | pytest-randomly | random test order | catches order-dependent tests |
 | factory-boy | model fixtures | — |
 | responses | HTTP mock | — |
-| ruff | style + security + no-print | CI fails on any violation |
-| mypy | type checking | CI fails on errors |
-| import-linter | architecture contracts | **CI fails on dependency violation** |
+| ruff | style + security + no-print + async + type-checking + pytest + simplify | CI fails on any violation in new code |
+| mypy | type checking | CI fails on errors in new apps |
+| import-linter | architecture contracts (10 contracts, 0 broken) | **CI fails on dependency violation** |
 | bandit | security scanning | CI warns (errors on HIGH severity) |
 
 Run all checks: `pre-commit run --all-files`
@@ -491,16 +493,19 @@ Run all checks: `npm run lint && npm run check && npm run test:all`
 
 ## Roadmap
 
-### Phase 1 — Foundation (backend hardening)
-- ARQ + Redis replacing Huey + SQLite
+### Phase 1 — Foundation (backend hardening) ✓ COMPLETE
+- ARQ + Redis replacing Huey + SQLite — `tasks_compat.py` deleted, all tasks async
 - structlog throughout `api/`
 - PostgreSQL only (remove SQLite path)
 - JWT (drf-simplejwt) replacing Djoser
-- ruff + mypy + import-linter + bandit wired to CI
+- ruff (E/W/F/I/B/C4/UP/S/T20/RUF/ASYNC/TCH/PT/SIM/DTZ) + mypy + import-linter + bandit wired to CI
 - Automated MinIO bucket init (`minio-init` container)
 - Healthchecks on all Docker services
 - Caddy replacing nginx for HTTPS
 - pytest coverage gate at 80%
+- 4 new apps: `events/`, `crdt/`, `exhibit/`, `media_relation/`
+- Annotation model extended: `annotation_type`, `reply_to`, `media_ref_uuid`
+- import-linter: 10 contracts, all passing (legacy violations documented as exemptions)
 
 ### Phase 2 — Frontend rebuild
 - Typed API client (`ui/src/lib/api.ts`)

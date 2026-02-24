@@ -20,16 +20,9 @@ class IsArchiveCreateOrReadOnly(BasePermission):
             group = Group.objects.get(id=group_id)
             if request.method in SAFE_METHODS and group.is_public:
                 return True
-            else:
-                if user in group.users.all():
-                    return True
-                else:
-                    return False
-        elif not group_id and user: # this is a search function to allow
-            if request.method in SAFE_METHODS:
-                return True
-            else:
-                return False
+            return user in group.users.all()
+        elif not group_id and user:  # this is a search function to allow
+            return request.method in SAFE_METHODS
         else:
             self.message = "User or Group detail missing"
             return False
@@ -46,10 +39,7 @@ class IsArchiveCopyAllowed(BasePermission):
             user = request.user
             if from_group_id and to_group_id and user:
                 group = Group.objects.get(id=to_group_id)
-                if user in group.users.all():
-                    return True
-                else:
-                    return False
+                return user in group.users.all()
             else:
                 self.message = "User or Group detail missing"
                 return False
@@ -66,14 +56,10 @@ class IsArchiveUpdateOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         # User must be a part of the group.
-        archive_instance = obj
         group = obj.group
         user = request.user
         if group and user:
-            if user in group.users.all():
-                return True
-            else:
-                return False
+            return user in group.users.all()
         else:
             self.message = "User or Group detail missing"
             return False

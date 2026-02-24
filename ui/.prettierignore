@@ -2,3 +2,12 @@
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# Generated — Paraglide i18n runtime (overwritten on each build)
+src/lib/i18n/
+
+# Build output
+build/
+
+# Vitest coverage reports
+coverage/

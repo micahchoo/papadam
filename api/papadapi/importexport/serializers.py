@@ -1,11 +1,6 @@
 from rest_framework import serializers
 
-from papadapi.annotate.models import Annotation
-from papadapi.archive.models import MediaStore
-
 # Common
-from papadapi.common.models import Group
-
 # Archive
 from papadapi.importexport.models import IERequest
 

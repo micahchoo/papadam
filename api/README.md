@@ -1,41 +1,107 @@
-# papad-api
-We are developing a tool called Participatory Listening and Sense-Making of Archives (PLASMA), previously known as Papad, a decentralised hypermedia annotation tool designed for use in regions with low internet connectivity and low-literate populations. PLASMA enables the creation and sharing of audio/video-based knowledge, making it accessible to those with lower literacy levels. It empowers communities to voice their perspectives on topics like art, culture, education, and technology, preserving knowledge for future generations. Our project focuses on web accessibility tailored to India's cultural, literacy, and socio-economic contexts. PLASMA allows users to upload audio, tag fragments, and create audio-visual stories, serving as a publishing platform without the barriers of literacy.
+# papadam/api
 
-[Click here](https://open.janastu.org/projects/papad) to know more about this project.
+Django 4.2 REST API — papadam hard fork of [papad-api](https://gitlab.com/servelots/papad/papad-api).
 
-[![Build Status](https://travis-ci.org/janastu/papad-api.svg?branch=master)](https://travis-ci.org/janastu/papad-api)
-[![Built with](https://img.shields.io/badge/Built_with-Cookiecutter_Django_Rest-F7B633.svg)](https://github.com/agconti/cookiecutter-django-rest)
+See [`../ARCHITECTURE.md`](../ARCHITECTURE.md) for the full system design.
 
-Papad Backend API. Check out the project's [documentation](http://janastu.github.io/papad-api/).
+---
 
-# Prerequisites
-
-- [Docker](https://docs.docker.com/docker-for-mac/install/)
-
-# Local Development
-
-Start the dev server for local development:
-```bash
-docker-compose up
-```
-
-Run a command inside the docker container:
+## Quick start (local, no Docker)
 
 ```bash
-docker-compose run --rm web [command]
+# 1. Create venv and install all dev + test dependencies
+make install
+
+# 2. Run lint (ruff strict on new code + import-linter architecture contracts)
+make lint-full
+
+# 3. Run tests
+make test
+
+# 4. Run tests with coverage gate (80%)
+make test-cov
 ```
 
+All `make` targets use `.venv` automatically — no manual `source activate` needed.
 
+---
 
-Integrations to consider later
-1. Healthcheck ? https://github.com/mwarkentin/django-watchman/
-2. Thumbnail images ? https://easy-thumbnails.readthedocs.io/en/latest/index.html
-3. Migrate from DRF to Ninja ? https://django-ninja.rest-framework.com/ (Question is do we need such a powerful framework when we just need a simple API system ?)
-4. Organizations / Groups : https://github.com/bennylope/django-organizations/ if so then also https://github.com/soynatan/django-easy-audit
-5. Input sanitization ? https://github.com/mozilla/bleach
-6. Statistics :https://goaccess.io/ and https://monitoror.com/documentation/
+## Requirements files
 
+| File | Purpose |
+|---|---|
+| `requirements/requirements.txt` | Runtime dependencies |
+| `requirements/requirements-dev.txt` | Lint / type-check / arch (`-r requirements.txt`) |
+| `requirements/requirements-test.txt` | Test runner (`-r requirements.txt`) |
 
-Known Limitations :
+---
 
-1. Everytime you bring a app up, you will need to manually login to minio, and change the access mode to public.
+## Running with Docker
+
+```bash
+# Start all services (postgres, redis, minio, api, bg-app, crdt, caddy)
+docker compose -f ../deploy/docker-compose.yml up
+
+# Run migrations inside the api container
+docker compose -f ../deploy/docker-compose.yml exec api python manage.py migrate
+
+# Tail worker logs
+docker compose -f ../deploy/docker-compose.yml logs -f bg-app
+```
+
+---
+
+## Django settings
+
+| Module | Used by |
+|---|---|
+| `papadapi.config.production` | Production (via `DJANGO_CONFIGURATION=Production`) |
+| `papadapi.config.local` | Local dev with services (requires `service_config.env`) |
+| `papadapi.config.test` | pytest / CI — SQLite in-memory, no external services |
+
+CI sets `DJANGO_SETTINGS_MODULE=papadapi.config.test` — no env file needed.
+
+---
+
+## ARQ worker
+
+```bash
+# Start the background task worker locally (requires Redis)
+.venv/bin/python -m arq papadapi.worker.WorkerSettings
+```
+
+Registered tasks: `delete_annotate_post_schedule`, `delete_media_post_schedule`,
+`convert_to_hls`, `convert_to_hls_audio`, `upload_to_storage`,
+`export_request_task`, `import_request_task`.
+
+---
+
+## Linting
+
+```bash
+make lint          # ruff on new/migrated apps (strict)
+make lint-arch     # import-linter — 10 architecture contracts
+make lint-full     # both
+
+# Full codebase ruff (informational — legacy violations non-blocking)
+.venv/bin/ruff check papadapi/ --exit-zero --statistics
+```
+
+### Active ruff rule sets
+
+`E W F I B C4 UP S T20 RUF ASYNC TCH PT SIM DTZ`
+
+Legacy violations (~140) are tracked but not touched until a file is fully migrated.
+
+---
+
+## Architecture contracts (import-linter)
+
+10 contracts enforced in CI. Run locally with `make lint-arch`.
+
+Key constraints:
+- `queue.py` is a utility leaf — may not import from any app
+- New apps (`crdt`, `events`, `exhibit`, `media_relation`) follow the strict layered graph
+- Legacy `common` and `archive` have documented exemptions for pre-existing cross-imports
+
+See `pyproject.toml` `[tool.importlinter]` for the full contract list.

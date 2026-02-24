@@ -1,4 +1,4 @@
-from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from papadapi.common.models import Group
 
@@ -22,10 +22,7 @@ class IsGroupOwnerMemberOrReadOnly(BasePermission):
             if request.method in SAFE_METHODS and group.is_public:
                 return True
             else:
-                if user in group.users.all():
-                    return True
-                else:
-                    return False
+                return user in group.users.all()
         else:
             self.message = "User or Group detail missing"
             return False

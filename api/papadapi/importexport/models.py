@@ -1,14 +1,7 @@
-import hashlib
-import json
-import os
 import uuid
-from functools import partial
 
-from django.core.files import File
 from django.db import models
 from django.utils.translation import gettext as _
-
-from papadapi.users.models import User
 
 
 class IERequest(models.Model):
