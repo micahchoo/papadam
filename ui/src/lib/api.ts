@@ -311,6 +311,7 @@ export const archive = {
 		searchWhere?: 'name' | 'description' | 'tags';
 		searchFrom?: 'all_collections' | 'my_collections' | 'public' | 'selected_collections';
 		searchCollections?: string; // comma-separated group IDs
+		mediaType?: 'audio' | 'video' | 'image';
 		page?: number;
 		page_size?: number;
 	}) => http.get<PaginatedResponse<MediaStore>>('/api/v1/archive/', { params }),

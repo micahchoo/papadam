@@ -20,6 +20,7 @@ const { mockHttp } = vi.hoisted(() => ({
 		patch: vi.fn(),
 		delete: vi.fn(),
 		put: vi.fn(),
+		defaults: { baseURL: '' },
 		interceptors: {
 			request: { use: vi.fn() },
 			response: { use: vi.fn() }

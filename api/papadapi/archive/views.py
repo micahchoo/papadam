@@ -256,6 +256,14 @@ class MediaStoreCreateSet(
 
         final_query = query & group_query if query else group_query
 
+        # mediaType filter: narrows by MIME prefix (audio/video/image).
+        # Unknown values silently ignored — no 400, preserves existing client behaviour.
+        _ALLOWED_MEDIA_TYPES: frozenset[str] = frozenset({"audio", "video", "image"})
+        media_type_param = self.request.GET.get("mediaType")
+        if media_type_param in _ALLOWED_MEDIA_TYPES:
+            media_type_q = Q(file_extension__startswith=media_type_param)
+            final_query = final_query & media_type_q if final_query else media_type_q
+
         if final_query:
             return (
                 MediaStore.objects.filter(final_query & Q(is_delete=False))

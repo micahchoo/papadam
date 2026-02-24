@@ -10,54 +10,45 @@ _Last updated: 2026-02-24. Overwrite this file each loop; do not append._
 |---|---|
 | `svelte-check` | 0 errors, 0 warnings (582 files) |
 | `eslint` | 0 errors, 0 warnings |
-| `vitest run` | 84/85 passed (1 pre-existing config caching flake — not caused by this round) |
-| `pytest` | 118/118 passed |
-| `ruff` | 0 violations (pre-existing manage-prod.py issues unchanged) |
+| `vitest run` | 85/85 passed |
+| `pytest` | 124/124 passed |
+| `ruff` | 0 violations |
 | `lint-imports` | 10/10 contracts kept |
 
 ---
 
-## Delta (this session — round 15: Whisper transcript display)
+## Delta (this session — rounds 16–17)
 
-### Backend
+### Round 16: bug & lint squash
 
-- `papadapi/common/storage.py` — NEW: extracted shared MinIO helpers (`minio_client`, `extract_minio_domain`) — 3rd consumer triggered the extraction (TODO from round 1)
-- `papadapi/archive/tasks.py` — import helpers from `common/storage`; remove duplicated `_minio_client` / `_extract_domain`
-- `papadapi/annotate/tasks.py` — same; remove duplicated MinIO helpers
-- `papadapi/archive/models.py` — add `transcript_vtt_url = URLField(blank=True, default='')`
-- `papadapi/archive/migrations/0023_mediastore_transcript_vtt_url.py` — migration
-- `papadapi/archive/serializers.py` — add `transcript_vtt_url` to fields
-- `papadapi/archive/views.py` — add `MediaStoreTranscriptView` (`POST /api/v1/archive/<uuid>/transcript/` with `X-Internal-Key` auth); add structlog + default_storage imports
-- `papadapi/config/common.py` — add `INTERNAL_SERVICE_KEY = env.str("INTERNAL_SERVICE_KEY", "")`
-- `papadapi/config/test.py` — add `INTERNAL_SERVICE_KEY = ""` stub
-- `papadapi/urls.py` — register `api/v1/archive/<uuid>/transcript/` endpoint
-- `papadapi/archive/tests.py` — fix patches to use `minio_client`/`extract_minio_domain`; add 5 new `MediaStoreTranscriptView` tests
-- `papadapi/annotate/tests/test_tasks.py` — fix Minio patches to use `minio_client`/`extract_minio_domain`
+- `archive/views.py` — move `log` below imports (E402 x9); remove unused `# noqa: ANN001` (RUF100)
+- `annotate/tests/test_tasks.py` — wrap long `patch()` lines (E501 x2)
+- `manage.py` + `manage-prod.py` — `-> None`, `# noqa: F401`, `raise ... from exc` (ANN201, PGH004, B904)
+- `wait_for_postgres.py` — annotate `pg_isready()` + wrap long log (ANN, E501)
+- `ui/src/lib/api.ts` — lazy `ensureBaseUrl()` in interceptor (was eager module-init); fixes Vitest config-cache flake
+- `common/storage.py` — add `delete_minio_object()`; annotate/tasks.py deletes raw files after HLS transcode
+- `annotate/tests/test_tasks.py` — 2 new raw-file-deletion tests
 
-### Transcribe worker
+### Round 17: mediaType filter + exhibit picker upgrade
 
-- `transcribe/worker.py` — implement `transcribe_media(ctx, media_uuid)`:
-  - Download media from upload URL via httpx stream
-  - Run `whisper.load_model(_WHISPER_MODEL).transcribe()`
-  - Convert segments to WebVTT via `_segments_to_vtt()`
-  - POST VTT to `/api/v1/archive/<uuid>/transcript/` with `X-Internal-Key`
-  - Registered in `WorkerSettings.functions = [transcribe_media]`
+**Backend:**
+- `archive/views.py` — `mediaType` query param (`audio|video|image`) via `file_extension__startswith` filter in `MediaStoreCreateSet.get_queryset`; `frozenset[str]` typed; unknown values silently ignored
+- `archive/tests.py` — 4 new TDD tests (audio, video, unknown, absent)
 
-### Frontend
+**Frontend:**
+- `api.ts` — add `mediaType?: 'audio' | 'video' | 'image'` to `archive.list` params
+- `exhibits/[uuid]/edit/+page.svelte` — replace static 100-item `groupMedia` with paginated server-side-filtered picker: `loadPickerMedia(reset)` with type filter (`<select>`), search (`<input>`), "Load more" pagination
+- `api.test.ts` — add `defaults: { baseURL: '' }` to mockHttp (defensive; prevents future `Cannot set properties of undefined` if interceptor is invoked)
 
-- `ui/src/lib/api.ts` — add `transcript_vtt_url: string` to `MediaStore` interface
-- `ui/src/lib/stores.ts` — add `showTranscript` derived store from `uiConfig.player_controls.show_transcript`
-- `ui/src/lib/components/MediaPlayer.svelte` — add `transcriptUrl?: string` prop; wire `<track kind="captions">` element; `default` attribute set when URL present
-- `ui/src/routes/groups/[id]/media/[slug]/+page.svelte` — pass `transcriptUrl` to `MediaPlayer`; add transcript panel controlled by `$showTranscript` UIConfig flag; `loadTranscript()` + `parseVtt()` helpers; lazy-loaded on "Show transcript" button click
-- `ui/src/lib/stores.test.ts` — add `transcript_vtt_url: ''` to `MOCK_MEDIA` fixture
+**Docs:**
+- `ARCHITECTURE.md` — Phase 3: `[x] Whisper transcript`; Phase 4: `[x] Archive picker: mediaType + search + pagination`
 
 ---
 
 ## Gaps
 
-- Pre-existing Vitest flake: `config.test.ts > loadConfig > is cached` — fetch called 2× instead of 1 due to `api.ts` module init calling `resolveBaseUrl()` on `vi.resetModules()` re-import. Not introduced this round.
-- Pre-existing unhandled rejection in `api.test.ts`: `Cannot set properties of undefined (setting 'baseURL')` — `http.defaults` undefined in Vitest environment. Not introduced this round.
-- `transcribe_media` worker function is not yet covered by backend tests (transcribe app is separate process with no pytest setup)
+- `_fetch_job_status` coroutine-never-awaited RuntimeWarning in pytest — pre-existing, non-fatal
+- `transcribe_media` worker function not covered by backend tests (separate process, no pytest setup)
 
 ---
 
@@ -65,8 +56,7 @@ _Last updated: 2026-02-24. Overwrite this file each loop; do not append._
 
 | Item | Rounds | Notes |
 |---|---|------|
-| Raw annotation files not deleted from MinIO after HLS transcode | 1 | TODO(loop) in `annotate/tasks.py`. |
-| Pre-existing Vitest config cache flake | 1 | `config.test.ts` — fix requires isolating `api.ts` module init in tests. |
+| Archive picker: remaining filters (tags, date, author, transcript) | — | Phase 5. |
 | `[data-profile]` icon/voice rendering | 1→5 | Phase 5. |
 | `[data-voice]` TTS / voice UI | 1→5 | Phase 5. |
 | `UIConfig.offline_first` service worker | 1→5 | Phase 5. |

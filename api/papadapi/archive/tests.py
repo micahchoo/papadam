@@ -4,6 +4,7 @@ import subprocess
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from django.urls import reverse
 
 from papadapi.archive.models import MediaStore
 from papadapi.archive.tasks import (
@@ -279,3 +280,82 @@ def test_transcript_upload_unknown_uuid_returns_404(api_client, settings):
         HTTP_X_INTERNAL_KEY="test-key",
     )
     assert resp.status_code == 404
+
+
+# ── mediaType filter ──────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_archive_list_filter_media_type_audio(auth_client, group):
+    """mediaType=audio returns only audio media."""
+    MediaStore.objects.create(
+        name="audio item", group=group, file_extension="audio/mpeg", is_delete=False,
+    )
+    MediaStore.objects.create(
+        name="video item", group=group, file_extension="video/mp4", is_delete=False,
+    )
+    url = (
+        reverse("MediaStoreCreateRoute-list")
+        + "?searchFrom=selected_collections&searchCollections="
+        + f"{group.id}&mediaType=audio"
+    )
+    resp = auth_client.get(url)
+    assert resp.status_code == 200
+    names = [r["name"] for r in resp.json()["results"]]
+    assert "audio item" in names
+    assert "video item" not in names
+
+
+@pytest.mark.django_db
+def test_archive_list_filter_media_type_video(auth_client, group):
+    """mediaType=video returns only video media."""
+    MediaStore.objects.create(
+        name="audio item", group=group, file_extension="audio/mpeg", is_delete=False,
+    )
+    MediaStore.objects.create(
+        name="video item", group=group, file_extension="video/mp4", is_delete=False,
+    )
+    url = (
+        reverse("MediaStoreCreateRoute-list")
+        + "?searchFrom=selected_collections&searchCollections="
+        + f"{group.id}&mediaType=video"
+    )
+    resp = auth_client.get(url)
+    assert resp.status_code == 200
+    names = [r["name"] for r in resp.json()["results"]]
+    assert "video item" in names
+    assert "audio item" not in names
+
+
+@pytest.mark.django_db
+def test_archive_list_filter_media_type_unknown_ignored(auth_client, group):
+    """Unknown mediaType value is silently ignored — returns all."""
+    MediaStore.objects.create(
+        name="audio item", group=group, file_extension="audio/mpeg", is_delete=False,
+    )
+    url = (
+        reverse("MediaStoreCreateRoute-list")
+        + "?searchFrom=selected_collections&searchCollections="
+        + f"{group.id}&mediaType=unknown"
+    )
+    resp = auth_client.get(url)
+    assert resp.status_code == 200
+    assert resp.json()["count"] >= 1
+
+
+@pytest.mark.django_db
+def test_archive_list_filter_media_type_absent_returns_all(auth_client, group):
+    """No mediaType param returns all types."""
+    MediaStore.objects.create(
+        name="audio item", group=group, file_extension="audio/mpeg", is_delete=False,
+    )
+    MediaStore.objects.create(
+        name="video item", group=group, file_extension="video/mp4", is_delete=False,
+    )
+    url = (
+        reverse("MediaStoreCreateRoute-list")
+        + f"?searchFrom=selected_collections&searchCollections={group.id}"
+    )
+    resp = auth_client.get(url)
+    assert resp.status_code == 200
+    assert resp.json()["count"] >= 2

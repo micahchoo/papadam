@@ -1,7 +1,7 @@
 # Creating an admin user
 
 **Note:** Only someone with access to the server (SSH or Portainer console) can do this.
-Admin accounts are intentional not self-serve.
+Admin accounts are intentionally not self-serve.
 
 ## Steps
 
@@ -23,7 +23,7 @@ Admin accounts are intentional not self-serve.
    python manage.py createsuperuser
    ```
 
-   Follow the prompts. Use a real email — it is displayed to users as a support contact.
+   Follow the prompts. The email is used for Django admin purposes only — it is not shown to users.
 
 4. Exit the container:
 

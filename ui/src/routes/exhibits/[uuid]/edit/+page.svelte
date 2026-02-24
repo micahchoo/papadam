@@ -29,13 +29,15 @@
 	let addBlockError = $state('');
 
 	// Group media picker
-	let groupMedia = $state<MediaStore[]>([]);
-	let mediaSearch = $state('');
-	const filteredMedia = $derived(
-		mediaSearch.trim()
-			? groupMedia.filter((m) => m.name.toLowerCase().includes(mediaSearch.toLowerCase()))
-			: groupMedia
-	);
+	type MediaTypeFilter = 'all' | 'audio' | 'video' | 'image';
+	let currentGroup = $state<number | null>(null);
+	let pickerSearch = $state('');
+	let pickerMediaType = $state<MediaTypeFilter>('all');
+	let pickerPage = $state(1);
+	let pickerTotal = $state(0);
+	const PICKER_PAGE_SIZE = 20;
+	let pickerLoading = $state(false);
+	let pickerMedia = $state<MediaStore[]>([]);
 
 	// Block deletion
 	let deletingBlockId = $state<number | null>(null);
@@ -68,16 +70,9 @@
 			editIsPublic = data.is_public;
 			blocks = data.blocks;
 
-			// Load group media for the picker (up to 100 items)
 			if (data.group) {
-				const mediaResp = await archive.list({
-					searchFrom: 'selected_collections',
-					searchCollections: String(data.group),
-					page_size: 100
-				});
-				groupMedia = mediaResp.data.results;
-				const first = groupMedia[0];
-				if (first) selectedMediaUuid = first.uuid;
+				currentGroup = data.group;
+				await loadPickerMedia(true);
 			}
 		} catch {
 			error = 'Exhibit not found.';
@@ -85,6 +80,36 @@
 			loading = false;
 		}
 	});
+
+	async function loadPickerMedia(reset = false): Promise<void> {
+		if (!currentGroup) return;
+		if (reset) {
+			pickerPage = 1;
+			pickerMedia = [];
+		}
+		pickerLoading = true;
+		try {
+			const params: Parameters<typeof archive.list>[0] = {
+				searchFrom: 'selected_collections',
+				searchCollections: String(currentGroup),
+				page: pickerPage,
+				page_size: PICKER_PAGE_SIZE,
+			};
+			if (pickerSearch.trim()) {
+				params.search = pickerSearch.trim();
+				params.searchWhere = 'name';
+			}
+			if (pickerMediaType !== 'all') params.mediaType = pickerMediaType;
+			const { data } = await archive.list(params);
+			pickerMedia = reset ? data.results : [...pickerMedia, ...data.results];
+			pickerTotal = data.count;
+			if (reset && data.results[0]) selectedMediaUuid = data.results[0].uuid;
+		} catch {
+			// keep previous results on error
+		} finally {
+			pickerLoading = false;
+		}
+	}
 
 	async function handleSave() {
 		saving = true;
@@ -129,8 +154,7 @@
 			blocks = [...blocks, newBlock];
 			newBlockCaption = '';
 			if (newBlockType === 'media') {
-				const first = groupMedia[0];
-				if (first) selectedMediaUuid = first.uuid;
+				if (pickerMedia[0]) selectedMediaUuid = pickerMedia[0].uuid;
 			} else {
 				newAnnotationUuid = '';
 			}
@@ -351,41 +375,55 @@
 			</select>
 
 			{#if newBlockType === 'media'}
-				{#if groupMedia.length > 0}
-					<label class="mb-1 block text-sm font-medium text-gray-600" for="media-search"
-						>Search media</label
-					>
-					<input
-						id="media-search"
-						type="search"
-						bind:value={mediaSearch}
-						placeholder="Filter by name…"
-						class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
-					/>
-					<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-media-select"
-						>Select media item</label
-					>
-					<select
-						id="blk-media-select"
-						bind:value={selectedMediaUuid}
-						class="mb-4 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
-					>
-						{#each filteredMedia as m}
-							<option value={m.uuid}>{mediaLabel(m)}</option>
-						{/each}
-					</select>
-				{:else}
-					<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-uuid"
-						>Media UUID</label
-					>
-					<input
-						id="blk-uuid"
-						type="text"
-						bind:value={selectedMediaUuid}
-						placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-						class="mb-4 w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm focus:outline-none focus:ring focus:ring-blue-200"
-					/>
-				{/if}
+				<!-- Media type filter -->
+				<label class="mb-1 block text-sm font-medium text-gray-600" for="picker-type">Type</label>
+				<select
+					id="picker-type"
+					bind:value={pickerMediaType}
+					onchange={() => void loadPickerMedia(true)}
+					class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
+				>
+					<option value="all">All</option>
+					<option value="audio">Audio</option>
+					<option value="video">Video</option>
+					<option value="image">Image</option>
+				</select>
+
+				<!-- Free-text search -->
+				<label class="mb-1 block text-sm font-medium text-gray-600" for="picker-search">Search</label>
+				<input
+					id="picker-search"
+					type="search"
+					bind:value={pickerSearch}
+					placeholder="Filter by name…"
+					onchange={() => void loadPickerMedia(true)}
+					class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
+				/>
+
+				<!-- Results select -->
+				<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-media-select">Select media item</label>
+				<select
+					id="blk-media-select"
+					bind:value={selectedMediaUuid}
+					class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
+				>
+					{#each pickerMedia as m}
+						<option value={m.uuid}>{mediaLabel(m)}</option>
+					{/each}
+				</select>
+				<p class="mb-2 text-xs text-gray-400">
+					{#if pickerLoading}
+						Loading…
+					{:else}
+						Showing {pickerMedia.length} of {pickerTotal}
+						{#if pickerMedia.length < pickerTotal}
+							· <button
+								class="underline"
+								onclick={() => { pickerPage += 1; void loadPickerMedia(); }}
+							>Load more</button>
+						{/if}
+					{/if}
+				</p>
 			{:else}
 				<label class="mb-1 block text-sm font-medium text-gray-600" for="blk-ann-uuid"
 					>Annotation UUID</label

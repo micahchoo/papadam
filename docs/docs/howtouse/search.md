@@ -1,47 +1,40 @@
-# Searching
+# Searching and sorting
 
-You can search the archive by name, description, tags, and other fields.
+You can search and sort media within a group's archive.
 
-## Searching within a group
+## Getting there
 
-Open a group's archive page. Use the search and filter controls at the top of the media list.
-
-![Search dashboard](/static/search/searchDashboard.png)
+Open a group from the **Collections** page. The search and sort controls appear
+above the media list.
 
 ## Search by name
 
-Type in the name field to filter media by title.
-
-![Search by name](/static/search/name.png)
-![Search results by name](/static/search/nameRes.png)
-
-## Search by description
-
-Filter media by description text.
-
-![Search by description](/static/search/desc.png)
-![Search results by description](/static/search/descRes.png)
+Select **Name** in the search dropdown (this is the default), then type in the search box.
+The media list filters in real time as you type.
 
 ## Search by tags
 
-Click a tag in the sidebar to filter media that has that tag.
-Click multiple tags to narrow results further.
+Select **Tags** in the search dropdown, then type one or more tag names separated by commas.
+Only media items that match **all** tags you entered are shown.
 
-**Single tag:**
-![Tag search](/static/search/searchTags.png)
+## Sorting
 
-**Multiple tags:**
-![Multi-tag search](/static/search/searchTagsMulti.png)
+Use the **Sort** dropdown on the right to change the order:
 
-## Search by group
+| Option | Description |
+|---|---|
+| **Newest to Oldest** | Most recently uploaded first (default) |
+| **Oldest to Newest** | Earliest uploads first |
+| **Name Ascending** | A → Z |
+| **Name Descending** | Z → A |
 
-Filter results to a specific group.
+## What is not available yet
 
-![Group search](/static/search/group_search.png)
+The following search features are planned for a future release:
 
-## Search by annotation content
+- Search by description text
+- Search by annotation content
+- Filter by media type (audio / video / image) within a group view
+- Cross-group search
 
-Find media that has annotations matching your search text.
-
-![Annotation search](/static/search/annotations.png)
-![Annotation search results](/static/search/anno.png)
+<!-- TODO(loop): Screenshots need recapturing from papadam UI (current images are from upstream papad Vue UI) -->

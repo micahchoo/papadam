@@ -35,8 +35,11 @@ Each item in an exhibit is a **block**. Blocks are displayed in the order they w
 3. Choose a block type:
    - **Media** — a media item from the archive (audio, video, or image)
    - **Annotation** — a specific annotation from a media item
-4. For **Media** blocks: use the search box to filter by name, then select an item
-   from the dropdown. If no media has been uploaded to the group yet, enter the UUID manually.
+4. For **Media** blocks:
+   - Use the **Type** dropdown to narrow by media type (All, Audio, Video, Image).
+   - Use the **Search** box to filter by name.
+   - Pick an item from the results dropdown. If the archive has more than 20 items,
+     click **Load more** to fetch the next page.
    For **Annotation** blocks: enter the annotation UUID.
 5. Optionally add a **Caption** — text shown beneath the block.
 6. Click **Add Block**.

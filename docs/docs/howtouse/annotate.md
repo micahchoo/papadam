@@ -16,10 +16,6 @@ Annotations can be time-anchored to a specific segment.
 5. Fill in **Description** (required) and **Tags** (optional, comma-separated).
 6. Click **Create Annotation**.
 
-![Annotation page](/static/annotate/annotatePage.png)
-
-![Annotation form](/static/annotate/mandatoryFields.png)
-
 ## Annotation types
 
 | Type | Description |
@@ -42,8 +38,6 @@ Each annotation shows:
 
 Replies appear indented under their parent annotation, each showing the author's username and the time posted.
 
-![Annotation submitted](/static/annotate/AnnoSuccess.png)
-
 ## Deleting your own annotation
 
 A **Delete** button appears under annotations you created.
@@ -64,6 +58,7 @@ and sync when you reconnect — no data is lost.
 
 ## Annotating audio
 
-The same form applies to audio files. The media player shows the waveform and playback position.
+The same annotation form applies to audio files. The media player uses your browser's
+native audio controls with skip forward / skip backward buttons.
 
-![Audio annotation page](/static/annotate/AudioAnnoPage.png)
+<!-- TODO(loop): Screenshots need recapturing from papadam UI (current images are from upstream papad Vue UI) -->

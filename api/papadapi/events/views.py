@@ -7,9 +7,8 @@ at ~2 s intervals.  When ARQ async workers are fully migrated (Phase 2),
 this can be upgraded to SSE or WebSocket.
 """
 
-import asyncio
-
 import structlog
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from rest_framework import status
 from rest_framework.request import Request
@@ -59,7 +58,7 @@ class JobStatusView(APIView):
 
         redis_url: str = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
         try:
-            job_status = asyncio.run(_fetch_job_status(redis_url, job_id))
+            job_status = async_to_sync(_fetch_job_status)(redis_url, job_id)
         except Exception as exc:
             log.error("job_status_fetch_failed", job_id=job_id, error=str(exc))
             return Response(

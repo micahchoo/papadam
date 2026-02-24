@@ -321,19 +321,16 @@ ExhibitBlock  (ordered list within an Exhibit)
 
 ### Archive picker
 
-The exhibit builder UI presents a full-archive picker that filters by:
+The exhibit builder UI presents a server-side paginated picker. Currently implemented filters:
 
-- Group
-- Tags
-- Media type (audio / video / image)
-- Date range
-- Annotation author
-- Transcript content (if transcribe worker enabled)
-- Free-text search across all metadata
+- **Media type** — audio / video / image / all (dropdown)
+- **Free-text search** — filters by media name
 
-Each picked item becomes an `ExhibitBlock`. Blocks are reorderable by drag or keyboard.
-A block can clip a specific time range, play an annotation in context, or display
-a media-to-media thread as a visual dialogue.
+Results load in pages of 20 with a "Load more" button. Group is implicit (active group).
+
+Remaining filters (Phase 5): tags, date range, annotation author, transcript content.
+
+Each picked item becomes an `ExhibitBlock`. Blocks are reorderable by ▲/▼ buttons (drag reorder is Phase 5).
 
 ### API
 
@@ -546,7 +543,7 @@ are detailed in the Backend Constraints section above.
 | PostgreSQL-only | Phase 1 | ✓ | |
 | Y.js CRDT annotations | Phase 2 | ✓ | |
 | HLS.js adaptive player | Phase 2 | ✓ | |
-| Exhibit builder | Phase 2 | ✓ (deepened Phase 4) | Archive picker multi-filter deferred → Phase 5 |
+| Exhibit builder | Phase 2 | ✓ (deepened Phase 4) | mediaType + search + pagination picker shipped; remaining filters (tags, date, author) → Phase 5 |
 | UIConfig per-group | Phase 2 | ✓ (landed Phase 4) | More complex than estimated — slipped one phase |
 | Image overlay annotations | Phase 3 | ✓ | |
 | Audio/video reply transcode | Phase 3 | ✓ | Full ARQ pipeline |
@@ -589,14 +586,14 @@ because CRDT semantics must not control moderation state.
 - Threaded reply display in AnnotationViewer
 - Exhibit viewer + basic exhibit editor
 - ESLint + svelte-check + eslint-boundaries wired to CI
-- Vitest unit tests (83 tests, 97%+ line coverage) + Playwright E2E smoke
+- Vitest unit tests (85 tests, 97%+ line coverage) + Playwright E2E smoke
 - i18n skeleton (Paraglide, English catalog)
 - adapter-static SPA build → `ui/build/` served by nginx container
 
 ### Phase 3 — Media depth + inclusivity
 - [x] Image overlay annotations during video/audio playback
 - [x] Audio + video reply annotation upload UI — raw upload + HLS transcode pipeline wired
-- [ ] Whisper transcript display in media player
+- [x] Whisper transcript display in media player
 - [ ] Service worker + offline annotation queue + background sync
 - [ ] WCAG AA audit + fixes
 
@@ -613,11 +610,26 @@ because CRDT semantics must not control moderation state.
 - [x] Image file upload + `media_ref_uuid` input in annotation modal
 - [x] `[data-profile]` / `[data-color-scheme]` HTML attributes + high-contrast / warm / cool CSS
 - [x] DOMPurify sanitization on `{@html}` in exhibit viewer
-- [ ] Full archive picker (multi-filter: tags, type, date, author, transcript) — Phase 5
+- [x] Archive picker: mediaType filter (audio/video/image) + server-side search + pagination
+- [ ] Archive picker: remaining filters (tags, date, author, transcript) — Phase 5
 - [ ] Block drag/keyboard reorder — Phase 5
 - [ ] `icon` and `voice` interaction profiles full rendering — Phase 5
 
-### Phase 5 — Exhibit builder depth + federation (future)
-- ActivityPub for cross-instance archive sharing
-- Import/export in open formats (building on existing tarball system)
-- Decentralised identity (DID) for community members
+### Phase 5 — Polish, depth, federation (future)
+
+Deferred from Phase 3:
+- [ ] Service worker + offline annotation queue + background sync
+- [ ] WCAG AA full audit + fixes (high-contrast profile shipped; full audit pending)
+
+Deferred from Phase 4:
+- [ ] Archive picker: remaining filters (tags, date range, annotation author, transcript content)
+- [ ] Exhibit block drag reorder (▲/▼ buttons are live)
+- [ ] `icon` and `voice` interaction profiles — full rendering (CSS vars + UIConfig wired; profile-specific UIs pending)
+- [ ] `player_controls.show_waveform` — audio waveform display
+- [ ] `player_controls.show_transcript` — Whisper captions below player
+- [ ] Exhibit publish endpoint (`GET /api/v1/exhibit/{uuid}/publish/`)
+
+New:
+- [ ] ActivityPub for cross-instance archive sharing
+- [ ] Import/export in open formats (building on existing tarball system)
+- [ ] Decentralised identity (DID) for community members

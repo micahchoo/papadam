@@ -51,7 +51,7 @@ Changes to colours apply immediately in your browser without a page reload.
 | **Skip backward / Skip forward** | How many seconds the skip buttons jump — drag each slider (5–60 s) |
 | **Default quality** | Starting bitrate for HLS streams: `Auto` adapts to the viewer's connection speed |
 | **Show waveform** | Display an audio waveform under the player (coming in a future release) |
-| **Show transcript** | Display Whisper captions below the player (coming in a future release) |
+| **Show transcript** | Display Whisper captions below the player |
 
 ---
 

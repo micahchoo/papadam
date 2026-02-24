@@ -3,31 +3,20 @@
 Groups are the primary organisational unit. Each group has its own archive of media,
 its own members, and its own settings.
 
+## Browsing groups
+
+Click **Collections** in the navigation bar to see available groups. Click a group card
+to open its archive page, where you can view media, upload, and annotate.
+
 ## Creating a group
 
-Click **Create group** in the navigation bar and fill in the group name and settings.
-
-![Group creation form](/static/groups/group_create.png)
-
-## Group settings
-
-| Setting | Description |
-|---|---|
-| **Public / Private** | Public: anyone can see the group and browse its media. Members-only: only group members can see it. In both cases, only members can upload and annotate. |
-| **Keep deleted data** | How long before deleted media and annotations are permanently removed. 0 = immediately. 1 = after 1 day. 2 = after 2 days. Etc. |
-| **Extra fields** | Custom questions shown on the upload and annotation forms. Allows groups to collect community-specific metadata alongside every contribution. |
-
-![Group settings](/static/groups/group_settings.png)
-
-![Delete retention setting](/static/groups/deletion_timelimit.png)
+Groups are created by instance admins through the Django admin panel at `/nimda/`.
+There is no self-service group creation in the frontend.
 
 ## Adding users to a group
 
-In group settings, click **Add users**, search by username, and add them.
-
-![Adding users to a group](/static/groups/adding_users_to_group.png)
-
-Only group members and instance admins can add users.
+User management is handled by instance admins through the admin panel.
+Only admins can add or remove group members.
 
 ## Customising the workspace
 
@@ -41,3 +30,5 @@ Click **Settings** in the navigation bar to:
 - Enable or disable the exhibit builder
 
 See [Customising your group's workspace](../admin/settings.md) for a full reference.
+
+<!-- TODO(loop): Screenshots need recapturing from papadam UI (current images are from upstream papad Vue UI) -->

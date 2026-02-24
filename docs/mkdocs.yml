@@ -1,6 +1,5 @@
-site_name: PAPAD
-site_description: Papad Documentation
-repo_url: https://gitlab.com/servelots/papad/papad-docs
+site_name: papadam
+site_description: papadam documentation
 site_dir: site
 copyright: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
 dev_addr: 0.0.0.0:8001

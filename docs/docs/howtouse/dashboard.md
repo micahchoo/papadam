@@ -1,14 +1,14 @@
-# Home page
+# Collections
 
-The home page shows the groups available on this instance.
+The **Collections** page lists all the groups on this instance.
+Click **Collections** in the navigation bar to reach it (you are also sent here after logging in).
 
-![Dashboard](/static/dashboard/dashboard.png)
+Each group appears as a card showing its name and description. Click any card to open
+that group's media archive.
 
-## Sections
+## Landing page
 
-**Your groups** — groups you are a member of. You can upload media and annotate within these groups.
+The home page (click the site name or **Home** in the nav bar) is a splash page
+with a **View Collections** button. It does not list groups directly.
 
-**Other public groups** — groups you are not a member of but that are publicly visible.
-You can browse and read annotations, but you cannot upload or annotate.
-
-Click on any group to open its media archive.
+<!-- TODO(loop): Screenshots need recapturing from papadam UI (current images are from upstream papad Vue UI) -->
