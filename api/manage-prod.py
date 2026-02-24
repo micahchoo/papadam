@@ -4,24 +4,24 @@ import os
 import sys
 
 
-def main():
+def main() -> None:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "papadapi.config")
     os.environ.setdefault("DJANGO_CONFIGURATION", "Production")
 
     try:
         from configurations.management import execute_from_command_line
-    except ImportError:
+    except ImportError as exc:
         # The above import may fail for some other reason. Ensure that the
         # issue is really that Django is missing to avoid masking other
         # exceptions on Python 2.
         try:
-            import django  # noqa
+            import django  # noqa: F401
         except ImportError:
             raise ImportError(
                 "Couldn't import Django. Are you sure it's installed and "
                 "available on your PYTHONPATH environment variable? Did you "
                 "forget to activate a virtual environment?"
-            )
+            ) from exc
         raise
     execute_from_command_line(sys.argv)
 

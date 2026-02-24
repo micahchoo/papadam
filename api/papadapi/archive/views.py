@@ -2,10 +2,15 @@ import json
 import uuid
 from datetime import timedelta
 
+import structlog
+from django.conf import settings
+from django.core.files.storage import default_storage
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from rest_framework import generics, mixins, status, viewsets
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from papadapi.archive.permissions import (
     IsArchiveCopyAllowed,
@@ -22,6 +27,7 @@ from papadapi.users.permissions import IsSuperUser
 from .models import MediaStore
 from .serializers import MediaStatsSerializer, MediaStoreSerializer
 
+log = structlog.get_logger(__name__)
 
 class MediaStoreRemoveTag(
     mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
@@ -445,3 +451,39 @@ class GroupMediaStats(
             )
             serializer = MediaStatsSerializer(base_data, many=True)
             return Response(serializer.data)
+
+
+class MediaStoreTranscriptView(APIView):
+    """POST /api/v1/archive/<uuid>/transcript/ — store a WebVTT file for a media item.
+
+    Called by the transcribe worker after Whisper finishes.  Authenticated via
+    the ``X-Internal-Key`` header (must match ``settings.INTERNAL_SERVICE_KEY``).
+    Storing the VTT through Django's default storage backend lets us reuse
+    whatever backend (MinIO, S3) is already configured.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []  # no JWT — key-based auth only
+
+    def post(self, request, uuid: str) -> Response:
+        expected: str = getattr(settings, "INTERNAL_SERVICE_KEY", "")
+        key: str = request.headers.get("X-Internal-Key", "")
+        if not expected or key != expected:
+            return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
+
+        vtt_file = request.FILES.get("vtt")
+        if not vtt_file:
+            return Response(
+                {"detail": "vtt file required."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            m = MediaStore.objects.get(uuid=uuid)
+        except MediaStore.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        vtt_path = default_storage.save(f"transcripts/{uuid}.vtt", vtt_file)
+        m.transcript_vtt_url = default_storage.url(vtt_path)
+        m.save(update_fields=["transcript_vtt_url"])
+        log.info("transcript_saved", media_uuid=uuid, url=m.transcript_vtt_url)
+        return Response({"transcript_vtt_url": m.transcript_vtt_url})

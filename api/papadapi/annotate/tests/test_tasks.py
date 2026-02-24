@@ -59,13 +59,14 @@ async def test_transcode_audio_updates_field_to_hls_manifest(annotation):
     with (
         patch("papadapi.annotate.tasks.asyncio.create_subprocess_exec",
               return_value=fake_proc),
-        patch("papadapi.annotate.tasks.Minio") as mock_minio_cls,
+        patch("papadapi.annotate.tasks.minio_client", return_value=MagicMock()),
+        patch("papadapi.annotate.tasks.extract_minio_domain",
+              return_value="minio:9000"),
         patch("papadapi.annotate.tasks.os.makedirs"),
         patch("papadapi.annotate.tasks.os.walk",
               return_value=[("/tmp/x", [], ["stream.m3u8", "stream0.ts"])]),
         patch("papadapi.annotate.tasks.os.remove"),
     ):
-        mock_minio_cls.return_value = MagicMock()
         await transcode_annotation_audio({}, annotation.id)
 
     await annotation.arefresh_from_db()
@@ -125,13 +126,14 @@ async def test_transcode_video_updates_field_to_hls_manifest(annotation):
     with (
         patch("papadapi.annotate.tasks.asyncio.create_subprocess_exec",
               side_effect=[fake_probe, fake_ffmpeg]),
-        patch("papadapi.annotate.tasks.Minio") as mock_minio_cls,
+        patch("papadapi.annotate.tasks.minio_client", return_value=MagicMock()),
+        patch("papadapi.annotate.tasks.extract_minio_domain",
+              return_value="minio:9000"),
         patch("papadapi.annotate.tasks.os.makedirs"),
         patch("papadapi.annotate.tasks.os.walk",
               return_value=[("/tmp/x", [], ["stream.m3u8", "stream0.ts"])]),
         patch("papadapi.annotate.tasks.os.remove"),
     ):
-        mock_minio_cls.return_value = MagicMock()
         await transcode_annotation_video({}, annotation.id)
 
     await annotation.arefresh_from_db()
