@@ -2,6 +2,7 @@
 	import DOMPurify from 'dompurify';
 	import { annotations as annoApi, mediaRelation } from '$lib/api';
 	import type { Annotation } from '$lib/api';
+	import { currentUser } from '$lib/stores';
 
 	interface Props {
 		annotations?: Annotation[];

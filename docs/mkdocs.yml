@@ -14,5 +14,7 @@ nav:
     - Upload Audio/Video: 'howtouse/uploadmedia'
     - Annotation: 'howtouse/annotate'
     - Search: 'howtouse/search'
+    - Exhibits: 'howtouse/exhibits'
   - Instance Admin:
-    - Creating superuser : admin/create_admin_user.md
+    - Creating superuser: admin/create_admin_user.md
+    - Customising the workspace: admin/settings.md

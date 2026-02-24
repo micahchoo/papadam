@@ -26,6 +26,9 @@
 	let addingBlock = $state(false);
 	let addBlockError = $state('');
 
+	// Block deletion
+	let deletingBlockId = $state<number | null>(null);
+
 	// Delete exhibit
 	let deleting = $state(false);
 
@@ -99,6 +102,18 @@
 			addBlockError = 'Failed to add block. Check that the UUID is valid.';
 		} finally {
 			addingBlock = false;
+		}
+	}
+
+	async function handleDeleteBlock(blockId: number) {
+		deletingBlockId = blockId;
+		try {
+			await exhibits.blocks.delete(exhibitUuid, blockId);
+			blocks = blocks.filter((b) => b.id !== blockId);
+		} catch {
+			alert('Failed to remove block.');
+		} finally {
+			deletingBlockId = null;
 		}
 	}
 
@@ -195,6 +210,13 @@
 									<p class="text-xs italic text-gray-500">{block.caption}</p>
 								{/if}
 							</div>
+							<button
+								onclick={() => void handleDeleteBlock(block.id)}
+								disabled={deletingBlockId === block.id}
+								class="shrink-0 text-xs text-red-500 hover:underline disabled:opacity-50"
+							>
+								{deletingBlockId === block.id ? '…' : 'Remove'}
+							</button>
 						</li>
 					{/each}
 				</ol>

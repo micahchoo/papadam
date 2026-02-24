@@ -8,7 +8,7 @@ import structlog
 from django.db.models import QuerySet
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
@@ -79,3 +79,26 @@ class ExhibitViewSet(
         blocks_qs = ExhibitBlock.objects.filter(exhibit=exhibit).order_by("order")
         serializer = ExhibitBlockSerializer(blocks_qs, many=True)
         return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path=r"blocks/(?P<block_id>\d+)",
+        permission_classes=[IsAuthenticated],
+    )
+    def delete_block(
+        self, request: Request, uuid: str | None = None, block_id: str | None = None
+    ) -> Response:
+        """DELETE /api/v1/exhibit/<uuid>/blocks/<block_id>/ — remove a block."""
+        exhibit = self.get_object()
+        try:
+            block = ExhibitBlock.objects.get(id=int(block_id or 0), exhibit=exhibit)
+        except ExhibitBlock.DoesNotExist:
+            return Response(
+                {"detail": "Block not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        block.delete()
+        log.info(
+            "exhibit_block_deleted", exhibit_uuid=str(exhibit.uuid), block_id=block_id
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)

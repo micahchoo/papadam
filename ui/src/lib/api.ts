@@ -395,7 +395,11 @@ export const exhibits = {
 				ExhibitBlock,
 				'block_type' | 'media_uuid' | 'annotation_uuid' | 'caption' | 'order'
 			>
-		) => http.post<ExhibitBlock>(`/api/v1/exhibit/${exhibitUuid}/blocks/`, payload)
+		) => http.post<ExhibitBlock>(`/api/v1/exhibit/${exhibitUuid}/blocks/`, payload),
+
+		/** DELETE /api/v1/exhibit/<uuid>/blocks/<id>/ — remove a block */
+		delete: (exhibitUuid: string, blockId: number) =>
+			http.delete(`/api/v1/exhibit/${exhibitUuid}/blocks/${blockId}/`)
 	}
 };
 
@@ -404,13 +408,13 @@ export const exhibits = {
 export const crdt = {
 	/** Load binary Y.js state for a media item */
 	loadState: (mediaUuid: string) =>
-		http.get<ArrayBuffer>(`/api/v1/crdt/media/${mediaUuid}/`, {
+		http.get<ArrayBuffer>(`/api/v1/crdt/${mediaUuid}/`, {
 			responseType: 'arraybuffer'
 		}),
 
 	/** Persist binary Y.js state delta */
 	saveState: (mediaUuid: string, binary: Uint8Array) =>
-		http.put(`/api/v1/crdt/media/${mediaUuid}/`, binary, {
+		http.put(`/api/v1/crdt/${mediaUuid}/`, binary, {
 			headers: { 'Content-Type': 'application/octet-stream' }
 		})
 };

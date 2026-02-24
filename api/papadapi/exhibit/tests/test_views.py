@@ -105,3 +105,72 @@ def test_list_blocks(auth_client, exhibit, media):
     resp = auth_client.get(f"/api/v1/exhibit/{exhibit.uuid}/blocks/")
     assert resp.status_code == 200
     assert len(resp.data) == 1
+
+
+@pytest.mark.django_db
+def test_delete_block(auth_client, exhibit, media):
+    block = ExhibitBlock.objects.create(
+        exhibit=exhibit, block_type="media", media_uuid=media.uuid, order=0
+    )
+    resp = auth_client.delete(f"/api/v1/exhibit/{exhibit.uuid}/blocks/{block.id}/")
+    assert resp.status_code == 204
+    assert ExhibitBlock.objects.filter(id=block.id).count() == 0
+
+
+@pytest.mark.django_db
+def test_delete_block_404_for_unknown(auth_client, exhibit):
+    resp = auth_client.delete(f"/api/v1/exhibit/{exhibit.uuid}/blocks/99999/")
+    assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_delete_block_requires_auth(api_client, exhibit, media):
+    block = ExhibitBlock.objects.create(
+        exhibit=exhibit, block_type="media", media_uuid=media.uuid, order=0
+    )
+    resp = api_client.delete(f"/api/v1/exhibit/{exhibit.uuid}/blocks/{block.id}/")
+    assert resp.status_code == 401
+
+
+# ── Update ────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_exhibit_update_title(auth_client, exhibit):
+    resp = auth_client.patch(
+        f"/api/v1/exhibit/{exhibit.uuid}/",
+        data={"title": "Renamed"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    exhibit.refresh_from_db()
+    assert exhibit.title == "Renamed"
+
+
+@pytest.mark.django_db
+def test_exhibit_update_requires_auth(api_client, exhibit):
+    resp = api_client.patch(
+        f"/api/v1/exhibit/{exhibit.uuid}/",
+        data={"title": "No auth"},
+        format="json",
+    )
+    assert resp.status_code == 401
+
+
+# ── Delete ────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_exhibit_delete(auth_client, exhibit):
+    resp = auth_client.delete(f"/api/v1/exhibit/{exhibit.uuid}/")
+    assert resp.status_code == 204
+    assert Exhibit.objects.filter(uuid=exhibit.uuid).count() == 0
+
+
+@pytest.mark.django_db
+def test_exhibit_delete_cascades_blocks(auth_client, exhibit, media):
+    ExhibitBlock.objects.create(
+        exhibit=exhibit, block_type="media", media_uuid=media.uuid, order=0
+    )
+    auth_client.delete(f"/api/v1/exhibit/{exhibit.uuid}/")
+    assert ExhibitBlock.objects.filter(exhibit=exhibit).count() == 0

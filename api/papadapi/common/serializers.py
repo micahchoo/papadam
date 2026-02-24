@@ -106,7 +106,7 @@ class UpdateGroupSerializer(serializers.ModelSerializer):
     extra_group_questions = QuestionsSerializer(many=True)
     tags = serializers.SerializerMethodField()
 
-    # TODO: Filter questions belonging to group
+    # TODO(loop): Filter extra_group_questions to those belonging to this group only
 
     class Meta:
         model = Group

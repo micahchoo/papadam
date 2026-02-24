@@ -313,12 +313,10 @@ Exhibit
 
 ExhibitBlock  (ordered list within an Exhibit)
   exhibit (FK), order (int)
-  block_type: "media" | "annotation" | "text" | "heading" | "divider"
-  media (FK → MediaStore, nullable)
-  annotation (FK → Annotation, nullable)
-  text_content (RichTextField, nullable)
-  start_time, end_time (float, nullable — clips a segment from the media item)
-  display_options (JSONField — layout hints: fullwidth, caption, autoplay, etc.)
+  block_type: "media" | "annotation"
+  media_uuid (UUID, nullable — references MediaStore)
+  annotation_uuid (UUID, nullable — references Annotation)
+  caption (text, blank)
 ```
 
 ### Archive picker
@@ -344,12 +342,11 @@ GET    /api/v1/exhibit/
 POST   /api/v1/exhibit/
 GET    /api/v1/exhibit/{uuid}/
 PUT    /api/v1/exhibit/{uuid}/
+PATCH  /api/v1/exhibit/{uuid}/
 DELETE /api/v1/exhibit/{uuid}/
 GET    /api/v1/exhibit/{uuid}/blocks/
 POST   /api/v1/exhibit/{uuid}/blocks/
-PUT    /api/v1/exhibit/{uuid}/blocks/{id}/     reorder + edit display_options
 DELETE /api/v1/exhibit/{uuid}/blocks/{id}/
-GET    /api/v1/exhibit/{uuid}/publish/         public render — no auth required
 ```
 
 ---

@@ -28,3 +28,16 @@ In group settings, click **Add users**, search by username, and add them.
 ![Adding users to a group](/static/groups/adding_users_to_group.png)
 
 Only group members and instance admins can add users.
+
+## Customising the workspace
+
+Each group can be configured with its own look and feature set from the **Settings** page.
+Click **Settings** in the navigation bar to:
+
+- Set the instance name, logo, and brand colours
+- Choose an interaction profile (standard, icon, voice, or high-contrast)
+- Control which annotation types (images, audio, video, media references) are available
+- Configure the media player skip intervals
+- Enable or disable the exhibit builder
+
+See [Customising your group's workspace](../admin/settings.md) for a full reference.
