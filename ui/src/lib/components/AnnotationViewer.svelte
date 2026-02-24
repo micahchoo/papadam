@@ -3,6 +3,7 @@
 	import { annotations as annoApi, mediaRelation } from '$lib/api';
 	import type { Annotation } from '$lib/api';
 	import { currentUser } from '$lib/stores';
+	import AnnotationMedia from '$lib/components/primitives/AnnotationMedia.svelte';
 
 	interface Props {
 		annotations?: Annotation[];
@@ -151,14 +152,9 @@
 							class="mt-2 max-w-full rounded border border-gray-200"
 						/>
 					{:else if annotation.annotation_type === 'audio' && annotation.annotation_audio}
-						<audio src={annotation.annotation_audio} controls class="mt-2 w-full">
-							Your browser does not support audio playback.
-						</audio>
+						<AnnotationMedia src={annotation.annotation_audio} mediaType="audio" />
 					{:else if annotation.annotation_type === 'video' && annotation.annotation_video}
-						<video src={annotation.annotation_video} controls class="mt-2 w-full bg-black">
-							<track kind="captions" src="" label="Captions" />
-							Your browser does not support video playback.
-						</video>
+						<AnnotationMedia src={annotation.annotation_video} mediaType="video" />
 					{:else if annotation.annotation_type === 'media_ref' && annotation.media_ref_uuid}
 						<p class="mt-2 text-sm text-gray-500">
 							Linked media: <code class="font-mono text-xs">{annotation.media_ref_uuid}</code>
@@ -169,6 +165,10 @@
 						{@html DOMPurify.sanitize(annotation.annotation_text || 'No note available')}
 					</div>
 
+					<p class="mt-1 text-xs text-gray-400">
+						{annotation.created_by?.username ?? 'Unknown'}
+					</p>
+
 					<div class="mt-2 flex gap-3">
 						<button
 							class="text-xs text-blue-600 hover:underline"
@@ -176,12 +176,14 @@
 						>
 							{expandedReplyFor === annotation.id ? 'Cancel' : 'Reply'}
 						</button>
-						<button
-							class="text-xs text-red-500 hover:underline"
-							onclick={() => void deleteAnno(annotation)}
-						>
-							Delete
-						</button>
+						{#if $currentUser && annotation.created_by?.id === $currentUser.id}
+							<button
+								class="text-xs text-red-500 hover:underline"
+								onclick={() => void deleteAnno(annotation)}
+							>
+								Delete
+							</button>
+						{/if}
 					</div>
 
 					<!-- Existing replies (prop-supplied + locally posted) -->
@@ -192,7 +194,9 @@
 									<div class="text-gray-700">
 										{@html DOMPurify.sanitize(reply.annotation_text || '')}
 									</div>
-									<span class="text-xs text-gray-400">{reply.created_at}</span>
+									<span class="text-xs text-gray-400">
+										{reply.created_by?.username ?? 'Unknown'} · {reply.created_at}
+									</span>
 								</li>
 							{/each}
 						</ul>
