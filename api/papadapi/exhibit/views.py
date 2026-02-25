@@ -16,6 +16,7 @@ from rest_framework.serializers import BaseSerializer
 
 from papadapi.common.models import Group
 from papadapi.exhibit.models import Exhibit, ExhibitBlock
+from papadapi.exhibit.permissions import IsExhibitGroupMemberOrReadOnly
 from papadapi.exhibit.serializers import (
     ExhibitBlockSerializer,
     ExhibitSerializer,
@@ -43,7 +44,7 @@ class ExhibitViewSet(
     """
 
     lookup_field = "uuid"
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsExhibitGroupMemberOrReadOnly]
 
     def get_serializer_class(self) -> type[BaseSerializer[Any]]:
         if self.action in ("create", "update", "partial_update"):
@@ -66,7 +67,7 @@ class ExhibitViewSet(
         detail=True,
         methods=["get", "post"],
         url_path="blocks",
-        permission_classes=[IsAuthenticatedOrReadOnly],
+        permission_classes=[IsAuthenticatedOrReadOnly, IsExhibitGroupMemberOrReadOnly],
     )
     def blocks(self, request: Request, uuid: str | None = None) -> Response:
         """GET|POST /api/v1/exhibit/<uuid>/blocks/ — list or append blocks."""
@@ -85,7 +86,7 @@ class ExhibitViewSet(
         detail=True,
         methods=["delete"],
         url_path=r"blocks/(?P<block_id>\d+)",
-        permission_classes=[IsAuthenticated],
+        permission_classes=[IsAuthenticated, IsExhibitGroupMemberOrReadOnly],
     )
     def delete_block(
         self, request: Request, uuid: str | None = None, block_id: str | None = None
@@ -108,7 +109,7 @@ class ExhibitViewSet(
         detail=True,
         methods=["post"],
         url_path="blocks/reorder",
-        permission_classes=[IsAuthenticated],
+        permission_classes=[IsAuthenticated, IsExhibitGroupMemberOrReadOnly],
     )
     def reorder_blocks(self, request: Request, uuid: str | None = None) -> Response:
         """POST /api/v1/exhibit/<uuid>/blocks/reorder/ — set display order.

@@ -9,6 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+RUN chown -R appuser:appgroup /app
+USER appuser
+
 HEALTHCHECK --interval=60s --timeout=10s \
   CMD python -c "import arq, whisper; print('ok')" || exit 1
 

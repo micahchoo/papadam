@@ -1,4 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from django.contrib import admin, messages
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from django.http import HttpRequest
 
 from papadapi.archive.models import MediaStore
 from papadapi.common.admin import BaseAdmin
@@ -19,7 +27,9 @@ class MediaStoreAdmin(BaseAdmin):
     actions = ["admin_withhold_media", "admin_unblock_media"]
 
     @admin.action(description="Withhold selected media")
-    def admin_withhold_media(self, request, queryset):
+    def admin_withhold_media(
+        self, request: HttpRequest, queryset: QuerySet[MediaStore],
+    ) -> None:
 
         queryset.update(is_instance_admin_withheld=True)
         queryset.update(is_delete=True)
@@ -28,7 +38,9 @@ class MediaStoreAdmin(BaseAdmin):
         )
 
     @admin.action(description="Unblock selected media")
-    def admin_unblock_media(self, request, queryset):
+    def admin_unblock_media(
+        self, request: HttpRequest, queryset: QuerySet[MediaStore],
+    ) -> None:
 
         queryset.update(is_instance_admin_withheld=False)
         queryset.update(is_delete=False)

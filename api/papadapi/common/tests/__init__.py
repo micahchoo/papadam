@@ -230,3 +230,93 @@ class TestUIConfigView:
         assert resp.data["exhibit_config"]["enabled"] is False
         cfg = UIConfig.objects.get(group=member_client.group)
         assert cfg.exhibit_config["enabled"] is False
+
+
+# ── Endpoint tests: HealthCheck, RuntimeConfig, Groups, Tags ──────────────────
+
+
+@pytest.mark.django_db
+class TestHealthCheckEndpoint:
+    def test_healthcheck_returns_200(self, api_client) -> None:
+        resp = api_client.get("/healthcheck/")
+        assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+class TestRuntimeConfigEndpoint:
+    def test_config_json_returns_200_anon(self, api_client) -> None:
+        resp = api_client.get("/config.json")
+        assert resp.status_code == 200
+        assert "API_URL" in resp.data
+        assert "CRDT_URL" in resp.data
+
+
+@pytest.mark.django_db
+class TestGroupEndpoints:
+    def test_list_groups_returns_200_anon(self, api_client) -> None:
+        resp = api_client.get("/api/v1/group/")
+        assert resp.status_code == 200
+
+    def test_list_groups_contains_public_group(self, api_client, group) -> None:
+        resp = api_client.get("/api/v1/group/")
+        assert resp.status_code == 200
+        names = [g["name"] for g in resp.data["results"]]
+        assert group.name in names
+
+    def test_retrieve_group_by_id(self, api_client, group) -> None:
+        resp = api_client.get(f"/api/v1/group/{group.id}/")
+        assert resp.status_code == 200
+        assert resp.data["name"] == group.name
+
+    def test_retrieve_nonexistent_group_returns_404(self, api_client) -> None:
+        resp = api_client.get("/api/v1/group/999999/")
+        assert resp.status_code == 404
+
+    def test_create_group_requires_auth(self, api_client) -> None:
+        resp = api_client.post(
+            "/api/v1/group/", data={"name": "test"}, format="json"
+        )
+        assert resp.status_code == 401
+
+
+@pytest.mark.django_db
+class TestTagsEndpoints:
+    def test_list_tags_returns_200(self, api_client) -> None:
+        resp = api_client.get("/api/v1/tags/")
+        assert resp.status_code == 200
+
+    def test_create_tag_requires_auth(self, api_client) -> None:
+        resp = api_client.post(
+            "/api/v1/tags/", data={"name": "newtag"}, format="json"
+        )
+        assert resp.status_code == 401
+
+
+# ── Adversarial endpoint tests ───────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestCommonAdversarial:
+    def test_group_retrieve_negative_id_returns_404(self, api_client) -> None:
+        resp = api_client.get("/api/v1/group/-1/")
+        assert resp.status_code == 404
+
+    def test_uiconfig_patch_authed_user_no_group_returns_404(
+        self, auth_client,
+    ) -> None:
+        resp = auth_client.patch(
+            "/api/v1/uiconfig/",
+            data={"brand_name": "No Group"},
+            format="json",
+        )
+        assert resp.status_code == 404
+
+    def test_uiconfig_patch_invalid_font_scale_returns_400(
+        self, member_client,
+    ) -> None:
+        resp = member_client.patch(
+            "/api/v1/uiconfig/",
+            data={"font_scale": "not_a_number"},
+            format="json",
+        )
+        assert resp.status_code == 400

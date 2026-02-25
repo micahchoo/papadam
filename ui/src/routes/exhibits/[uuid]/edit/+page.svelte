@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { archive, exhibits } from '$lib/api';
 	import type { ExhibitBlock, ExhibitBlockType, MediaStore } from '$lib/api';
+	import axios from 'axios';
 	import { isAuthenticated, exhibitEnabled } from '$lib/stores';
 
 	const exhibitUuid = $derived($page.params['uuid'] ?? '');
@@ -50,6 +51,8 @@
 	let deleting = $state(false);
 	let deleteError = $state('');
 	let showDeleteConfirm = $state(false);
+
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 	let loading = $state(true);
 	let error = $state('');
@@ -104,8 +107,11 @@
 			pickerMedia = reset ? data.results : [...pickerMedia, ...data.results];
 			pickerTotal = data.count;
 			if (reset && data.results[0]) selectedMediaUuid = data.results[0].uuid;
-		} catch {
-			// keep previous results on error
+		} catch (err: unknown) {
+			if (axios.isAxiosError(err) && !err.response) {
+				blockActionError = 'Unable to reach the server.';
+			}
+			// keep previous results on non-network errors
 		} finally {
 			pickerLoading = false;
 		}
@@ -125,8 +131,13 @@
 			setTimeout(() => {
 				saveSuccess = false;
 			}, 2_000);
-		} catch {
-			saveError = 'Failed to save changes.';
+		} catch (err: unknown) {
+			if (axios.isAxiosError(err) && err.response?.data) {
+				const data = err.response.data as Record<string, string[] | string>;
+				saveError = typeof data['detail'] === 'string' ? data['detail'] : 'Failed to save changes.';
+			} else {
+				saveError = 'Failed to save changes.';
+			}
 		} finally {
 			saving = false;
 		}
@@ -199,10 +210,11 @@
 
 		reordering = true;
 		try {
-			await exhibits.blocks.reorder(
+			const { data } = await exhibits.blocks.reorder(
 				exhibitUuid,
 				reordered.map((b) => b.id)
 			);
+			blocks = data;
 		} catch {
 			// Revert — swap back
 			const revertA = reordered[idx];
@@ -289,7 +301,7 @@
 			<button
 				onclick={() => void handleSave()}
 				disabled={saving}
-				class="rounded bg-blue-950 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+				class="rounded bg-brand-primary px-4 py-2 text-sm text-white hover:opacity-90 disabled:opacity-50"
 			>
 				{saving ? 'Saving…' : 'Save'}
 			</button>
@@ -396,7 +408,7 @@
 					type="search"
 					bind:value={pickerSearch}
 					placeholder="Filter by name…"
-					onchange={() => void loadPickerMedia(true)}
+					oninput={() => { clearTimeout(searchDebounceTimer); searchDebounceTimer = setTimeout(() => void loadPickerMedia(true), 300); }}
 					class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
 				/>
 
@@ -450,7 +462,7 @@
 			<button
 				onclick={() => void handleAddBlock()}
 				disabled={addingBlock}
-				class="rounded bg-blue-950 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+				class="rounded bg-brand-primary px-4 py-2 text-sm text-white hover:opacity-90 disabled:opacity-50"
 			>
 				{addingBlock ? 'Adding…' : 'Add Block'}
 			</button>

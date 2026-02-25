@@ -1,9 +1,8 @@
+from __future__ import annotations
+
 from rest_framework import serializers
 
-# Archive
 from papadapi.annotate.models import Annotation
-
-# Common
 from papadapi.common.serializers import TagsSerializer
 from papadapi.users.serializers import UserSerializer
 
@@ -11,6 +10,10 @@ from papadapi.users.serializers import UserSerializer
 class AnnotationSerializer(serializers.ModelSerializer):
     tags = TagsSerializer(many=True, read_only=True)
     created_by = UserSerializer(read_only=True)
+    annotation_type = serializers.ChoiceField(
+        choices=Annotation.AnnotationType.choices,
+        default=Annotation.AnnotationType.TEXT,
+    )
 
     class Meta:
         model = Annotation

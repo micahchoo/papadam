@@ -25,6 +25,7 @@ select = [
     "PERF", # perflint — performance anti-patterns
     "ANN",  # flake8-annotations — enforce type annotations on new code
     "PGH",  # pygrep-hooks — no blanket type: ignore, must use specific error codes
+    "BLE",  # flake8-blind-except — no bare `except Exception`
 ]
 ignore = [
     "S101",   # assert in tests is fine
@@ -43,12 +44,6 @@ ignore = [
 "*/migrations/*" = ["E501", "ANN"]  # generated code — long lines and untyped args expected
 "*/config/*"     = ["S105", "E501"] # dev/test settings: placeholder secrets + long setting values
 "*/archive/views.py" = ["S108"]    # /tmp/upload/ is intentional for the HLS processing pipeline
-# Legacy apps — ANN exempted until progressively annotated (ARCHITECTURE.md Phase 3+)
-"*/common/*"       = ["ANN"]
-"*/users/*"        = ["ANN"]
-"*/archive/*"      = ["ANN"]
-"*/annotate/*"     = ["ANN"]
-"*/importexport/*" = ["ANN"]
 
 [tool.ruff.lint.isort]
 known-first-party = [
@@ -72,8 +67,6 @@ strict_equality = true
 extra_checks = true
 
 # New apps: enforce full type annotation discipline.
-# Legacy apps (common, users, archive, annotate, importexport) are exempt until
-# progressively annotated — see ARCHITECTURE.md roadmap.
 [[tool.mypy.overrides]]
 module = [
     "papadapi.crdt.*",
@@ -87,6 +80,20 @@ disallow_incomplete_defs = true
 check_untyped_defs = true
 disallow_any_generics = true
 
+# Recently migrated apps — strict annotations but not disallow_any_generics
+# (DRF's ModelSerializer/GenericViewSet lack type parameters in stubs)
+[[tool.mypy.overrides]]
+module = [
+    "papadapi.users.*",
+    "papadapi.importexport.*",
+    "papadapi.common.*",
+    "papadapi.archive.*",
+    "papadapi.annotate.*",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+
 # Test modules: exempt from function-annotation enforcement.
 # Consistent with ruff ANN exemption for */tests/*.
 [[tool.mypy.overrides]]
@@ -95,6 +102,13 @@ module = [
     "papadapi.events.tests.*",
     "papadapi.exhibit.tests.*",
     "papadapi.media_relation.tests.*",
+    "papadapi.users.test.*",
+    "papadapi.importexport.tests.*",
+    "papadapi.common.tests",
+    "papadapi.common.tests.*",
+    "papadapi.archive.tests",
+    "papadapi.archive.tests.*",
+    "papadapi.annotate.tests.*",
 ]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false

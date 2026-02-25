@@ -6,13 +6,13 @@
 	import type { Group } from '$lib/api';
 
 	const COLORS = [
-		'bg-red-500',
-		'bg-blue-500',
-		'bg-green-500',
-		'bg-yellow-500',
-		'bg-purple-500',
-		'bg-pink-500',
-		'bg-cyan-500'
+		'bg-brand-primary',
+		'bg-brand-accent',
+		'bg-brand-primary opacity-80',
+		'bg-brand-accent opacity-80',
+		'bg-brand-primary opacity-60',
+		'bg-brand-accent opacity-60',
+		'bg-brand-primary opacity-40'
 	] as const;
 
 	let collections = $state<Group[]>([]);
@@ -42,7 +42,7 @@
 	{#if error}
 		<p class="text-red-500">{error}</p>
 	{:else if loading}
-		<div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-500 bg-opacity-50">
+		<div class="flex min-h-[40vh] items-center justify-center">
 			<div
 				class="loader h-12 w-12 rounded-full border-4 border-t-4 border-gray-200 ease-linear"
 			></div>
@@ -74,7 +74,7 @@
 
 <style>
 	.loader {
-		border-top-color: #3498db;
+		border-top-color: var(--brand-accent);
 		animation: spinner 0.6s linear infinite;
 	}
 	@keyframes spinner {

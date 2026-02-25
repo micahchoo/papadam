@@ -1,14 +1,20 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from rest_framework.permissions import AllowAny
-from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+if TYPE_CHECKING:
+    from rest_framework.request import Request
 
 from .models import Group, UIConfig
 from .uiconfig_serializer import UIConfigSerializer
 
 # Hardcoded default payload — avoids serializing an unsaved model instance
 # and allows anonymous access without touching the DB.
-_DEFAULT: dict = {
+_DEFAULT: dict[str, Any] = {
     "profile": "standard",
     "brand_name": "Papad.alt",
     "brand_logo_url": "",

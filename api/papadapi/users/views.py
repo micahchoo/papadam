@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Q, QuerySet
 from django.db.models.functions import TruncDate
 from rest_framework import generics, mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -14,7 +14,7 @@ class SearchUserView(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self, *args, **kwargs):
+    def get_queryset(self, *args: object, **kwargs: object) -> QuerySet[User]:
         if "search" in self.request.GET:
             search_query = self.request.GET["search"]
             return User.objects.filter(
@@ -33,10 +33,10 @@ class InstanceUserStats(viewsets.GenericViewSet, generics.ListAPIView):
     serializer_class = UserStatsSerializer
     permission_classes = [IsSuperUser]
 
-    def get_paginated_response(self, data):
+    def get_paginated_response(self, data: list[dict[str, object]]) -> Response:
         return Response(data)
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[User]:
         data = (
             User.objects.values("id")
             .annotate(created_date=TruncDate("date_joined"))
@@ -44,4 +44,4 @@ class InstanceUserStats(viewsets.GenericViewSet, generics.ListAPIView):
             .values("created_date")
             .annotate(**{"total": Count("created_date")})
         )
-        return data
+        return data  # type: ignore[return-value]

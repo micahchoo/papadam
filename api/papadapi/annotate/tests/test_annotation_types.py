@@ -82,3 +82,71 @@ def test_annotation_api_exposes_type_fields(auth_client, annotation):
 def test_annotation_list_returns_type_field(auth_client, annotation):
     resp = auth_client.get("/api/v1/annotate/")
     assert resp.status_code == 200
+
+
+# ── Adversarial tests ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_invalid_annotation_type_rejected(member_client, member_media):
+    """Invalid annotation_type is rejected at the view boundary."""
+    resp = member_client.post(
+        "/api/v1/annotate/",
+        {
+            "media_reference_id": str(member_media.uuid),
+            "media_target": "t=0,10",
+            "annotation_text": "test",
+            "annotation_type": "invalid",
+        },
+    )
+    assert resp.status_code == 400
+    assert "Invalid annotation_type" in resp.data["detail"]
+
+
+@pytest.mark.django_db
+def test_empty_annotation_text_accepted(member_client, member_media):
+    """RichTextField allows blank — empty text is valid."""
+    resp = member_client.post(
+        "/api/v1/annotate/",
+        {
+            "media_reference_id": str(member_media.uuid),
+            "media_target": "t=0,5",
+            "annotation_text": "",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.data["annotation_text"] == ""
+
+
+@pytest.mark.django_db
+def test_media_ref_with_nonexistent_uuid_stored(member_client, member_media):
+    """media_ref_uuid is a plain UUIDField — no FK validation, just stores the UUID."""
+    bogus_uuid = "deadbeef-dead-dead-dead-deaddeaddead"
+    resp = member_client.post(
+        "/api/v1/annotate/",
+        {
+            "media_reference_id": str(member_media.uuid),
+            "media_target": "t=0,5",
+            "annotation_type": "media_ref",
+            "media_ref_uuid": bogus_uuid,
+            "annotation_text": "cross-ref",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.data["media_ref_uuid"] == bogus_uuid
+
+
+@pytest.mark.django_db
+def test_reply_to_nonexistent_annotation_silently_ignored(member_client, member_media):
+    """View wraps reply_to lookup in contextlib.suppress — nonexistent ID is ignored."""
+    resp = member_client.post(
+        "/api/v1/annotate/",
+        {
+            "media_reference_id": str(member_media.uuid),
+            "media_target": "t=0,5",
+            "annotation_text": "orphan reply",
+            "reply_to": 999999,
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.data["reply_to"] is None

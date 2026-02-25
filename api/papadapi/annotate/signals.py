@@ -1,9 +1,11 @@
 """
-annotate/signals.py — handlers for cross-app signals.
+annotate/signals.py -- handlers for cross-app signals.
 
 annotate is above archive in the dependency graph, so it is allowed
 to import from archive.signals (not the other way around).
 """
+
+from __future__ import annotations
 
 from papadapi.annotate.models import Annotation
 from papadapi.archive.signals import media_copied

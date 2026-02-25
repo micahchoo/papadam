@@ -93,8 +93,10 @@ These are enforced by the codebase and CI, not configurable:
 | pytest, 80% coverage gate | CI fails below threshold |
 | drf-spectacular schema | `/api/schema/` always current; drives CRDT client types |
 | Dependency graph enforced | `import-linter` contracts in `pyproject.toml` — CI fails on violation |
-| Type checking | `mypy` with django-stubs — progressively strict |
+| Type checking | `mypy` with django-stubs — all 13 apps strict — zero legacy exemptions |
 | Security scanning | `bandit` on every CI run |
+| Rate limiting | DRF throttle: anon 100/hr, user 1000/hr (production) |
+| HTTPS hardening | HSTS 1yr + secure cookies + CSRF httponly (production, behind HTTPS) |
 | No circular imports | `import-linter` independence contract across all apps |
 | No `pages/` app | Deleted; SvelteKit owns all frontend routing |
 | No SQLite | Removed from requirements entirely |
@@ -153,8 +155,10 @@ importexport ←─────────────────────�
 queue   ←────────────────────────────── leaf — may not import from any app
 ```
 
-New apps strictly enforce the graph. Legacy apps (`common`, `archive`) have pre-existing
-cross-imports documented as `ignore_imports` in the contracts — these violations must not grow.
+New apps strictly enforce the graph. All three former legacy apps (`common`, `archive`, `annotate`)
+are now fully type-annotated and mypy-strict. Legacy `ignore_imports` for `common/` still exist
+(9 frozen) but no new violations are possible. `archive` and `annotate` have zero exemptions.
+`users/` and `importexport/` graduated from legacy exemption in Round 23 (fully typed, strict mypy).
 Contracts live in `api/pyproject.toml` under `[tool.importlinter]`.
 
 ### Frontend architecture (eslint-boundaries)
@@ -163,14 +167,15 @@ The module dependency graph in `ui/` is enforced by `eslint-plugin-boundaries`:
 
 ```
 api.ts       → leaf (no internal imports — pure HTTP client)
+hls.ts       → leaf (shared HLS.js utility — no internal imports)
 events.ts    → api only
 crdt.ts      → may import: stores
 config.ts    → may import: api
 stores.ts    → may import: config, crdt
 i18n/        → leaf
-primitives/  → leaf (unstyled components, no business logic)
-components/  → may import: api, stores, config, events, i18n, primitives
-routes/      → may import: everything
+primitives/  → may import: hls
+components/  → may import: api, stores, config, events, i18n, primitives, hls
+routes/      → may import: everything in lib/
 ```
 
 A component importing from a route, or `api.ts` importing from `stores`, fails the lint step.
@@ -405,13 +410,14 @@ One running instance serves all profiles. No custom builds. No per-community dep
 
 ```
 api.ts        leaf — pure HTTP, no internal imports
+hls.ts        leaf — shared HLS.js utility, no internal imports
 events.ts     → api only
 crdt.ts       → stores only
 config.ts     → api only
 stores.ts     → config, crdt
 i18n/         leaf
-primitives/   leaf — unstyled accessible components (bits-ui wrappers)
-components/   → api, stores, config, events, i18n, primitives
+primitives/   → hls
+components/   → api, stores, config, events, i18n, primitives, hls
 routes/       → anything in lib/
 ```
 
@@ -469,9 +475,9 @@ Run all checks: `npm run lint && npm run check && npm run test:all`
 | `bg-app` | build: ../api | always | ARQ worker |
 | `crdt` | build: ../crdt | always | y-websocket; healthcheck: /health; container: papadam-crdt |
 | `ui` | nginx:stable-alpine | always | serves ui/build/ SPA; container: papadam-ui |
-| `caddy` | caddy:2-alpine | `webserver` | standalone HTTPS via Let's Encrypt (alternative to NPM) |
-| `transcribe` | build: ../transcribe | `transcribe` | 2GB memory limit |
-| `docs` | build: ../docs | `docs` | MkDocs |
+| `caddy` | caddy:2-alpine | `webserver` | standalone HTTPS via Let's Encrypt; healthcheck; security headers |
+| `transcribe` | build: ../transcribe | `transcribe` | 2GB memory limit; healthcheck; non-root |
+| `docs` | build: ../docs | `docs` | MkDocs; healthcheck |
 | `backup` | postgres-backup-local | `backup` | daily, 7-day + 4-week + 6-month retention |
 
 ### Reverse proxy
@@ -495,9 +501,18 @@ NPM routes `/api/`, `/auth/`, `/nimda/`, `/config.json`, `/healthcheck/` → `pa
     file_server
     try_files {path} /index.html
     encode gzip
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Content-Security-Policy "default-src 'self' http: https: ws: wss: data: blob: 'unsafe-inline'"
+        Permissions-Policy "interest-cohort=()"
+    }
 }
 ```
 `DOMAIN` is the only required variable. Let's Encrypt cert provisioning is automatic.
+Security headers match upstream nginx `security.conf` (CSP, HSTS, Permissions-Policy).
 
 ### Runtime config injection
 
@@ -568,7 +583,7 @@ because CRDT semantics must not control moderation state.
 - structlog throughout `api/`
 - PostgreSQL only (remove SQLite path)
 - JWT (drf-simplejwt) replacing Djoser
-- ruff (E/W/F/I/B/C4/UP/S/T20/RUF/ASYNC/TCH/PT/SIM/DTZ) + mypy + import-linter + bandit wired to CI
+- ruff (E/W/F/I/B/C4/UP/S/T20/RUF/ASYNC/TCH/PT/SIM/DTZ/ERA/PERF/ANN/PGH) + mypy + import-linter + bandit + pip-audit wired to CI
 - Automated MinIO bucket init (`minio-init` container)
 - Healthchecks on all Docker services
 - Caddy replacing nginx for HTTPS
@@ -586,7 +601,7 @@ because CRDT semantics must not control moderation state.
 - Threaded reply display in AnnotationViewer
 - Exhibit viewer + basic exhibit editor
 - ESLint + svelte-check + eslint-boundaries wired to CI
-- Vitest unit tests (85 tests, 97%+ line coverage) + Playwright E2E smoke
+- Vitest unit tests (155 tests, 97%+ line coverage) + Playwright E2E smoke
 - i18n skeleton (Paraglide, English catalog)
 - adapter-static SPA build → `ui/build/` served by nginx container
 
@@ -602,7 +617,7 @@ because CRDT semantics must not control moderation state.
 - [x] Seed commands (`seed_dev`, `seed_prod`) — idempotent, env-driven
 - [x] Frontend UIConfig store + CSS var application on mount
 - [x] Settings page (auth-gated UIConfig editor, live CSS preview)
-- [x] Derived stores for all sub-features (`exhibitEnabled`, `allowedAnnotationTypes`, `playerSkipSeconds`, `timeRangeInputMode`)
+- [x] Derived stores for all sub-features (`exhibitEnabled`, `allowedAnnotationTypes`, `playerSkipSeconds`, `timeRangeInputMode`, `showTranscript`, `showWaveform`, `defaultQuality`, `dateLocale`)
 - [x] Exhibit nav link + routes gated by `exhibit_config.enabled`
 - [x] Annotation type filter via `annotations_config.allow_*`
 - [x] Skip buttons wired to `player_controls.skip_seconds`
@@ -611,6 +626,17 @@ because CRDT semantics must not control moderation state.
 - [x] `[data-profile]` / `[data-color-scheme]` HTML attributes + high-contrast / warm / cool CSS
 - [x] DOMPurify sanitization on `{@html}` in exhibit viewer
 - [x] Archive picker: mediaType filter (audio/video/image) + server-side search + pagination
+- [x] `default_quality` → HLS `startLevel` in MediaPlayer + AnnotationMedia
+- [x] In-group media type filter (SearchSort.svelte)
+- [x] `dateLocale` store replacing all hardcoded `'en-GB'` locale strings
+- [x] Brand token enforcement — `bg-brand-primary`/`bg-brand-accent` replacing 17 hardcoded Tailwind colors
+- [x] UIConfig → store completeness gate test (parametrized, enforces derived store for every actionable field)
+- [x] Wiring lint tests: banned hardcoded locale + banned hardcoded brand colors (source-grep)
+- [x] Backend type tightening: users/ + importexport/ fully annotated, mypy strict, ANN enforced (5→3 legacy exemptions)
+- [x] Backend security: HSTS, rate limiting, Docker non-root, healthchecks, pip-audit CI
+- [x] Backend type tightening: common/ + archive/ + annotate/ fully annotated, mypy strict (13/13), zero ANN exemptions
+- [x] UI audit: 5 dead stores removed, CRDT wrong-store bug fixed, 4 UX shadow flags resolved
+- [x] Exhibit hardening: object-level group permission, per-block error boundary, stale badge fix
 - [ ] Archive picker: remaining filters (tags, date, author, transcript) — Phase 5
 - [ ] Block drag/keyboard reorder — Phase 5
 - [ ] `icon` and `voice` interaction profiles full rendering — Phase 5
@@ -625,10 +651,69 @@ Deferred from Phase 4:
 - [ ] Archive picker: remaining filters (tags, date range, annotation author, transcript content)
 - [ ] Exhibit block drag reorder (▲/▼ buttons are live)
 - [ ] `icon` and `voice` interaction profiles — full rendering (CSS vars + UIConfig wired; profile-specific UIs pending)
-- [ ] `player_controls.show_waveform` — audio waveform display
+- [ ] `player_controls.show_waveform` — audio waveform renderer (store exists, Phase 5)
 - [ ] Exhibit publish endpoint (`GET /api/v1/exhibit/{uuid}/publish/`)
 
 New:
 - [ ] ActivityPub for cross-instance archive sharing
 - [ ] Import/export in open formats (building on existing tarball system)
 - [ ] Decentralised identity (DID) for community members
+
+---
+
+## Tech Debt — UI Audit Findings
+
+Discovered via full shadow-walk and wiring audit of all claimed Phase 4 completions (2026-02-24).
+
+### ~~Brand token enforcement gaps~~ RESOLVED (R35-C)
+
+Wiring-lint banned patterns widened from 4 to 8: added `bg-blue-100`, `bg-blue-200`,
+`text-blue-500`, `text-blue-100`. Hero, CTA, tag pills, and type badges all use brand tokens
+or semantic neutral colors. Intentional exclusions: `focus:ring-blue-200` (UI chrome),
+`text-blue-600` (link convention).
+
+### ~~Warm/cool color scheme CSS is functionally inert~~ RESOLVED (R35-B)
+
+Added `--scheme-bg` CSS custom property to `:root` and each `[data-color-scheme]` rule.
+`<main>` uses `bg-[var(--scheme-bg,#f3f4f6)]` instead of `bg-gray-100`. Warm, cool, and
+high-contrast schemes now visibly affect the content area background.
+
+### Reply threading limited to one level
+
+`AnnotationViewer.svelte:54-75` splits annotations into roots (`reply_to === null`) and
+replies (indexed by parent ID). Replies-to-replies are silently dropped — their parent ID
+won't match any root annotation, so they vanish without error. The backend allows
+arbitrary nesting via the `reply_to` FK.
+
+**Fix:** Either recurse the reply tree, or cap nesting at depth 1 server-side and
+document the constraint.
+
+### Dead stores in `stores.ts` -- FIXED (R32-B)
+
+All 5 dead stores (`accessToken`, `selectedMedia`, `isUploadModalOpen`, `isAnnotateModalOpen`,
+`isEditMediaModalOpen`) were removed in R32-B. Tests updated accordingly.
+
+### ~~Dead API method~~ RESOLVED (R33-B)
+
+`exhibits.blocks.list` deleted from `api.ts` and its test removed from `api.test.ts`.
+
+### `data-voice` attribute set but unconsumed
+
+`+layout.svelte:37-41` and `settings/+page.svelte:130-134` set/delete `data-voice` on
+`<html>`, but no CSS rule in `app.css` targets it.
+
+**Fix:** Either add CSS rules for voice mode (Phase 5), or stop setting the attribute
+until voice mode is implemented.
+
+### ~~`AnnotationMedia` empty caption track~~ RESOLVED (R33-B)
+
+Replaced `<track kind="captions" src="">` with `<track kind="captions" />` (no `src`
+attribute). Satisfies a11y without spurious browser request.
+
+### CRDT wrong-store bug -- FIXED (R32-B)
+
+Store target corrected from `selectedMediaDuration` to `playbackPosition` in R32-B.
+
+### ~~Archive picker search UX~~ RESOLVED (R33-B)
+
+Changed from `onchange` to `oninput` with 300ms debounce. Search triggers while typing.

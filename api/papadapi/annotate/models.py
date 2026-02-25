@@ -1,28 +1,36 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
 import os
 import uuid
 from functools import partial
+from typing import TYPE_CHECKING, Any
 
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from djrichtextfield.models import RichTextField
 
+if TYPE_CHECKING:
+    from typing import IO
+
+    from papadapi.common.models import Group as GroupModel
+
 from papadapi.archive.models import MediaStore
 
 logger = logging.getLogger(__name__)
 
 
-def hash_file(file, block_size=65536):
+def hash_file(file: IO[bytes], block_size: int = 65536) -> str:
     hasher = hashlib.md5(usedforsecurity=False)
     for buf in iter(partial(file.read, block_size), b""):
         hasher.update(buf)
     return hasher.hexdigest()
 
 
-def upload_to(instance, filename):
+def upload_to(instance: Annotation, filename: str) -> str:
     """
     :type instance: dolphin.models.File
     """
@@ -32,12 +40,12 @@ def upload_to(instance, filename):
     return f"annotate/{hash_file(instance.annotation_image)}{filename_ext}"
 
 
-def upload_to_audio(instance, filename):
+def upload_to_audio(instance: Annotation, filename: str) -> str:
     _, filename_ext = os.path.splitext(filename)
     return f"annotate/audio/{uuid.uuid4()}{filename_ext}"
 
 
-def upload_to_video(instance, filename):
+def upload_to_video(instance: Annotation, filename: str) -> str:
     _, filename_ext = os.path.splitext(filename)
     return f"annotate/video/{uuid.uuid4()}{filename_ext}"
 
@@ -117,33 +125,32 @@ class Annotation(models.Model):
         verbose_name_plural = _("Annotations")
         ordering = ["updated_at"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.media_reference_id
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("Annotation_detail", kwargs={"pk": self.pk})
 
-    def compute_group_id(self):
+    def compute_group_id(self) -> GroupModel | None:
         try:
             m = MediaStore.objects.get(uuid=uuid.UUID(self.media_reference_id))
             return m.group if m.group else None
         except (MediaStore.DoesNotExist, ValueError):
             return None
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.group:
             self.group = self.compute_group_id()
         super().save(*args, **kwargs)
 
-    def annotation_structure(self, media_id):
+    def annotation_structure(self, media_id: str) -> dict[str, Any]:
         "Returns every object in annotation structure"
         data = Annotation.objects.filter(media_reference_id=media_id)
 
-        resp_data = []
-        resp = {}  # This is the final response
+        resp_data: list[dict[str, Any]] = []
+        resp: dict[str, Any] = {}  # This is the final response
         for d in data:
-            ref_json = {}  # Referece json
-            a_struct = {}  # Annotation response json
+            ref_json: dict[str, Any] = {}  # Referece json
 
             # Load the reference annotation structure template
             with open("./papadapi/annotate/annotation_structure.json") as f:

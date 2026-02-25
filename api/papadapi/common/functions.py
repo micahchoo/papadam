@@ -1,10 +1,13 @@
+from __future__ import annotations
+
+from typing import Any
 
 from papadapi.annotate.models import Annotation
 from papadapi.archive.models import MediaStore
 from papadapi.common.models import Group, Tags
 
 
-def recalculate_tag_count(tag_instance):
+def recalculate_tag_count(tag_instance: Tags) -> None:
     tag_count = (
         MediaStore.objects.filter(tags__id=tag_instance.id).count()
         + Annotation.objects.filter(tags__id=tag_instance.id).count()
@@ -18,8 +21,12 @@ def recalculate_tag_count(tag_instance):
     tag_instance.save()
 
 
-def get_final_tags_count(media_tags_count, annotation_tags_count, count=False):
-    data = {}
+def get_final_tags_count(
+    media_tags_count: list[dict[str, Any]],
+    annotation_tags_count: list[dict[str, Any]],
+    count: bool = False,
+) -> list[dict[str, Any]]:
+    data: dict[Any, dict[str, Any]] = {}
     for val in media_tags_count + annotation_tags_count:
         key = val["tag_id"] if count else val["id"]
 
@@ -47,12 +54,18 @@ def get_final_tags_count(media_tags_count, annotation_tags_count, count=False):
     return list(data.values())
 
 
-def get_related_tags(group, tag, links, media=True, annotation=True):
+def get_related_tags(
+    group: int | str,
+    tag: int,
+    links: list[dict[str, int]],
+    media: bool = True,
+    annotation: bool = True,
+) -> list[dict[str, int]]:
     tag_obj = Tags.objects.filter(id=tag).first()
-    group = Group.objects.filter(id=group).first()
-    if media and tag_obj and group:
+    group_obj = Group.objects.filter(id=group).first()
+    if media and tag_obj and group_obj:
         related_tags = MediaStore.objects.filter(
-            group=group, tags=tag_obj
+            group=group_obj, tags=tag_obj
         ).distinct()
         return [
             {"source": tag, "target": rts_tag.id}
@@ -63,7 +76,7 @@ def get_related_tags(group, tag, links, media=True, annotation=True):
     return []
 
 
-def create_or_update_tag(tag):
+def create_or_update_tag(tag: str) -> Tags | None:
     tag_value = tag.lower().strip()
     if tag_value:
         t = Tags.objects.get_or_create(name=tag_value)[0]

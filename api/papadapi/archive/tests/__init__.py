@@ -1,6 +1,7 @@
 """Tests for archive async ARQ task functions."""
 
 import subprocess
+import uuid as _uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -359,3 +360,102 @@ def test_archive_list_filter_media_type_absent_returns_all(auth_client, group):
     resp = auth_client.get(url)
     assert resp.status_code == 200
     assert resp.json()["count"] >= 2
+
+
+# ── Archive endpoint tests (Round 29) ────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestMediaStoreListEndpoint:
+    def test_list_media_returns_200_with_group_filter(self, api_client, group, media):
+        url = (
+            reverse("MediaStoreCreateRoute-list")
+            + f"?searchFrom=selected_collections&searchCollections={group.id}"
+        )
+        resp = api_client.get(url)
+        assert resp.status_code == 200
+        assert resp.data["count"] >= 1
+
+    def test_list_media_empty_when_no_group_match(self, api_client):
+        url = (
+            reverse("MediaStoreCreateRoute-list")
+            + "?searchFrom=selected_collections&searchCollections=999999"
+        )
+        resp = api_client.get(url)
+        assert resp.status_code == 200
+        assert resp.data["count"] == 0
+
+
+@pytest.mark.django_db
+class TestMediaStoreRetrieveEndpoint:
+    def test_retrieve_media_by_uuid(self, api_client, media):
+        url = reverse(
+            "MediaStoreUpdateRoute-detail", kwargs={"uuid": str(media.uuid)}
+        )
+        resp = api_client.get(url)
+        assert resp.status_code == 200
+        assert resp.data["uuid"] == str(media.uuid)
+
+    def test_retrieve_nonexistent_uuid_returns_404(self, api_client):
+        fake_uuid = str(_uuid.uuid4())
+        url = reverse(
+            "MediaStoreUpdateRoute-detail", kwargs={"uuid": fake_uuid}
+        )
+        resp = api_client.get(url)
+        assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+class TestMediaStoreCreateEndpoint:
+    def test_create_media_requires_auth(self, api_client, group):
+        resp = api_client.post(
+            reverse("MediaStoreCreateRoute-list"),
+            data={"name": "test", "group": group.id},
+            format="json",
+        )
+        assert resp.status_code == 401
+
+
+@pytest.mark.django_db
+class TestMediaStoreUpdateEndpoint:
+    def test_update_media_name(self, member_client, member_media):
+        url = reverse(
+            "MediaStoreUpdateRoute-detail",
+            kwargs={"uuid": str(member_media.uuid)},
+        )
+        resp = member_client.put(
+            url,
+            data={
+                "name": "Updated Name",
+                "description": member_media.description,
+            },
+            format="json",
+        )
+        assert resp.status_code == 200
+        assert resp.data["name"] == "Updated Name"
+
+
+# ── Adversarial archive endpoint tests ───────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestArchiveAdversarial:
+    def test_retrieve_malformed_uuid_returns_404(self, api_client):
+        url = "/api/v1/archive/not-a-uuid/"
+        resp = api_client.get(url)
+        assert resp.status_code == 404
+
+    def test_list_with_deleted_media_excluded(self, api_client, group):
+        MediaStore.objects.create(
+            name="deleted item",
+            group=group,
+            is_delete=True,
+            file_extension="audio/mpeg",
+        )
+        url = (
+            reverse("MediaStoreCreateRoute-list")
+            + f"?searchFrom=selected_collections&searchCollections={group.id}"
+        )
+        resp = api_client.get(url)
+        names = [r["name"] for r in resp.data["results"]]
+        assert "deleted item" not in names

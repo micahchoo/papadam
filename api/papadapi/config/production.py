@@ -44,6 +44,15 @@ class Production(Common):
         if APP_HTTPS:
             SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
             CSRF_TRUSTED_ORIGINS = ["https://" + APP_URL]
+
+            # ── HTTPS security hardening ───────────────────────────────
+            SECURE_HSTS_SECONDS = 31536000  # 1 year
+            SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+            SECURE_HSTS_PRELOAD = True
+            SESSION_COOKIE_SECURE = True
+            CSRF_COOKIE_SECURE = True
+            CSRF_COOKIE_HTTPONLY = True
+            SECURE_CONTENT_TYPE_NOSNIFF = True
         else:
             SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "http")
             CSRF_TRUSTED_ORIGINS = ["http://" + APP_URL]

@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { uiconfig } from '$lib/api';
+	import axios from 'axios';
 	import type {
 		UIConfig,
 		UIConfigProfile,
@@ -14,6 +15,7 @@
 	let saving = $state(false);
 	let saved = $state(false);
 	let error = $state<string | null>(null);
+	let loaded = $state(false);
 
 	// Local form state mirroring UIConfig fields
 	let brandName = $state('Papad.alt');
@@ -76,11 +78,13 @@
 		const current = $uiConfig;
 		if (current) {
 			loadFromStore(current);
+			loaded = true;
 		} else {
 			try {
 				const { data } = await uiconfig.get();
 				uiConfig.set(data);
 				loadFromStore(data);
+				loaded = true;
 			} catch {
 				error = 'Failed to load settings.';
 			}
@@ -120,14 +124,26 @@
 				exhibit_config: { enabled: exhibitEnabled }
 			});
 			uiConfig.set(data);
-			// Apply CSS vars immediately so the change is visible without reload
+			// Apply CSS vars and data attributes immediately so changes are visible without reload
 			const root = document.documentElement;
 			root.style.setProperty('--brand-primary', data.primary_color);
 			root.style.setProperty('--brand-accent', data.accent_color);
 			root.style.setProperty('--font-scale', String(data.font_scale));
+			root.dataset['profile'] = data.profile;
+			root.dataset['colorScheme'] = data.color_scheme;
+			if (data.voice_enabled) {
+				root.dataset['voice'] = 'true';
+			} else {
+				delete root.dataset['voice'];
+			}
 			saved = true;
-		} catch {
-			error = 'Failed to save settings.';
+		} catch (err: unknown) {
+			if (axios.isAxiosError(err) && err.response?.data) {
+				const data = err.response.data as Record<string, string[] | string>;
+				error = typeof data['detail'] === 'string' ? data['detail'] : 'Failed to save settings.';
+			} else {
+				error = 'Failed to save settings.';
+			}
 		} finally {
 			saving = false;
 		}
@@ -150,6 +166,10 @@
 		<p class="mb-4 rounded border border-green-300 bg-green-50 px-4 py-2 text-sm text-green-700">
 			Settings saved.
 		</p>
+	{/if}
+
+	{#if !loaded && !error}
+		<p class="mb-4 text-sm text-gray-500">Loading settings...</p>
 	{/if}
 
 	<form
@@ -258,7 +278,7 @@
 			</label>
 
 			<label class="block">
-				<span class="text-sm text-gray-700">Icon set</span>
+				<span class="text-sm text-gray-700">Icon set <span class="text-xs text-gray-400">(experimental)</span></span>
 				<input
 					type="text"
 					bind:value={iconSet}
@@ -384,7 +404,7 @@
 
 		<button
 			type="submit"
-			disabled={saving}
+			disabled={saving || !loaded}
 			class="w-full rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
 		>
 			{saving ? 'Saving…' : 'Save settings'}

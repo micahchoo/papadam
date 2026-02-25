@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import Hls from 'hls.js';
-	import { selectedMediaDuration, playbackPosition, playerSkipSeconds } from '$lib/stores';
+	import { attachHls } from '$lib/hls';
+	import type { HlsHandle } from '$lib/hls';
+	import {
+		selectedMediaDuration,
+		playbackPosition,
+		playerSkipSeconds,
+		defaultQuality
+	} from '$lib/stores';
 
 	/** Minimal annotation shape MediaPlayer needs for image overlays. */
 	export interface ImageAnnotation {
@@ -30,10 +36,14 @@
 
 	let videoEl = $state<HTMLVideoElement | null>(null);
 	let audioEl = $state<HTMLAudioElement | null>(null);
-	let hls: Hls | null = null;
+	let hlsHandle: HlsHandle | null = null;
 
 	const isAudio = $derived(
 		src.startsWith('data:audio') || /\.(mp3|ogg|wav|flac|aac|m4a)(\?|$)/i.test(src)
+	);
+
+	const isImage = $derived(
+		/\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(src)
 	);
 
 	/** Parse "t=start,end" → [start, end] in seconds, or null if malformed. */
@@ -51,26 +61,23 @@
 		})?.annotation_image ?? null
 	);
 
-	function initHls(el: HTMLMediaElement, url: string) {
-		if (hls) {
-			hls.destroy();
-			hls = null;
-		}
-		if (url.includes('.m3u8') && Hls.isSupported()) {
-			hls = new Hls({ enableWorker: false });
-			hls.loadSource(url);
-			hls.attachMedia(el);
-		} else {
-			el.src = url;
-		}
+	/** Map UIConfig quality to HLS.js startLevel. -1 = auto, 0 = lowest, Infinity = highest. */
+	function qualityToStartLevel(q: string): number {
+		if (q === 'low') return 0;
+		if (q === 'high') return Infinity;
+		// 'medium' and 'auto' both use HLS auto-selection (-1)
+		return -1;
 	}
 
 	$effect(() => {
 		const el = isAudio ? audioEl : videoEl;
-		if (el && src) initHls(el, src);
+		if (el && src) {
+			hlsHandle?.destroy();
+			hlsHandle = attachHls(el, src, qualityToStartLevel($defaultQuality));
+		}
 		return () => {
-			hls?.destroy();
-			hls = null;
+			hlsHandle?.destroy();
+			hlsHandle = null;
 		};
 	});
 
@@ -107,68 +114,70 @@
 	}
 
 	onDestroy(() => {
-		hls?.destroy();
+		hlsHandle?.destroy();
 	});
 </script>
 
 <div class="media-player-container pb-5">
 	{#if src}
-		<div class="relative">
-			{#if isAudio}
-				<audio
-					bind:this={audioEl}
-					{controls}
-					{autoplay}
-					class="w-full"
-					onloadedmetadata={onLoadedMetadata}
-					ontimeupdate={onTimeUpdate}
+		{#if isImage}
+			<img src={src} alt="Media" class="w-full rounded" />
+		{:else}
+			<div class="relative">
+				{#if isAudio}
+					<audio
+						bind:this={audioEl}
+						{controls}
+						{autoplay}
+						class="w-full"
+						onloadedmetadata={onLoadedMetadata}
+						ontimeupdate={onTimeUpdate}
+					>
+						Your browser does not support the audio element.
+					</audio>
+				{:else}
+					<video
+						bind:this={videoEl}
+						{controls}
+						{autoplay}
+						class="h-full w-full bg-black"
+						onloadedmetadata={onLoadedMetadata}
+						ontimeupdate={onTimeUpdate}
+					>
+						<track kind="captions" src={transcriptUrl} label="Captions" default={!!transcriptUrl} />
+						Your browser does not support the video element.
+					</video>
+				{/if}
+				{#if activeOverlayImage}
+					<div
+						class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60"
+					>
+						<img
+							src={activeOverlayImage}
+							alt="Pinned annotation"
+							class="max-h-full max-w-full object-contain"
+						/>
+					</div>
+				{/if}
+			</div>
+			<div class="mt-2 flex items-center justify-center gap-4">
+				<button
+					onclick={() => skip(-$playerSkipSeconds[0])}
+					class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-700 hover:bg-gray-300"
+					aria-label="Skip back {$playerSkipSeconds[0]} seconds"
 				>
-					Your browser does not support the audio element.
-				</audio>
-			{:else}
-				<video
-					bind:this={videoEl}
-					{controls}
-					{autoplay}
-					class="h-full w-full bg-black"
-					onloadedmetadata={onLoadedMetadata}
-					ontimeupdate={onTimeUpdate}
+					← {$playerSkipSeconds[0]}s
+				</button>
+				<button
+					onclick={() => skip($playerSkipSeconds[1])}
+					class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-700 hover:bg-gray-300"
+					aria-label="Skip forward {$playerSkipSeconds[1]} seconds"
 				>
-					<track kind="captions" src={transcriptUrl} label="Captions" default={!!transcriptUrl} />
-					Your browser does not support the video element.
-				</video>
-			{/if}
-			{#if activeOverlayImage}
-				<div
-					class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60"
-				>
-					<img
-						src={activeOverlayImage}
-						alt="Pinned annotation"
-						class="max-h-full max-w-full object-contain"
-					/>
-				</div>
-			{/if}
-		</div>
-		<div class="mt-2 flex items-center justify-center gap-4">
-			<button
-				onclick={() => skip(-$playerSkipSeconds[0])}
-				class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-700 hover:bg-gray-300"
-				aria-label="Skip back {$playerSkipSeconds[0]} seconds"
-			>
-				← {$playerSkipSeconds[0]}s
-			</button>
-			<button
-				onclick={() => skip($playerSkipSeconds[1])}
-				class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-700 hover:bg-gray-300"
-				aria-label="Skip forward {$playerSkipSeconds[1]} seconds"
-			>
-				{$playerSkipSeconds[1]}s →
-			</button>
-		</div>
+					{$playerSkipSeconds[1]}s →
+				</button>
+			</div>
+		{/if}
 	{:else}
-		<video {controls} class="w-full bg-black"
-			><track kind="captions" src="" label="Captions" /></video
-		>
+		<video {controls} class="w-full bg-black"><track kind="captions" /></video>
 	{/if}
 </div>

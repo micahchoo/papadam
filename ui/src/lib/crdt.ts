@@ -11,7 +11,7 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
-import { selectedMediaDuration } from '$lib/stores';
+import { playbackPosition } from '$lib/stores';
 
 // ── Types matching ARCHITECTURE.md CRDT schema ────────────────────────────────
 
@@ -144,7 +144,7 @@ export function setAwarenessCursor(mediaUuid: string, positionSeconds: number): 
 	if (!current) return;
 	entry.awareness.setLocalState({ ...current, cursor: positionSeconds });
 	// Also push to the Svelte store so the player waveform can react
-	selectedMediaDuration.set(positionSeconds);
+	playbackPosition.set(positionSeconds);
 }
 
 /**

@@ -41,11 +41,11 @@ class UserMEApiSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("username",)
 
-    def get_groups(self, obj):
+    def get_groups(self, obj: User) -> list[dict[str, object]]:
         groups_user_in = Group.objects.filter(users__in=[obj])
-        return UsersAPIGroupSerializer(groups_user_in, many=True).data
+        return UsersAPIGroupSerializer(groups_user_in, many=True).data  # type: ignore[return-value]
 
-    def get_users_count(self, obj) -> int:
+    def get_users_count(self, obj: User) -> int:
         """Count of distinct users across all groups this user belongs to."""
         user_groups = Group.objects.filter(users__in=[obj])
         return User.objects.filter(group__in=user_groups).distinct().count()

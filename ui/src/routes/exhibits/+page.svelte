@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { exhibits } from '$lib/api';
 	import type { Exhibit } from '$lib/api';
+	import axios from 'axios';
 	import { isAuthenticated, selectedGroup, exhibitEnabled } from '$lib/stores';
 
 	let exhibitList = $state<Exhibit[]>([]);
@@ -53,8 +54,15 @@
 			showCreate = false;
 			newTitle = '';
 			newDescription = '';
-		} catch {
-			createError = 'Failed to create exhibit.';
+			newIsPublic = true;
+		} catch (err: unknown) {
+			if (axios.isAxiosError(err) && err.response?.data) {
+				const data = err.response.data as Record<string, string[] | string>;
+				const detail = typeof data['detail'] === 'string' ? data['detail'] : null;
+				createError = detail ?? 'Failed to create exhibit.';
+			} else {
+				createError = 'Failed to create exhibit.';
+			}
 		} finally {
 			creating = false;
 		}
@@ -69,7 +77,7 @@
 				onclick={() => {
 					showCreate = !showCreate;
 				}}
-				class="rounded bg-blue-950 px-4 py-2 text-sm text-white hover:bg-blue-700"
+				class="rounded bg-brand-primary px-4 py-2 text-sm text-white hover:opacity-90"
 			>
 				{showCreate ? 'Cancel' : 'New Exhibit'}
 			</button>
@@ -107,7 +115,7 @@
 			<button
 				onclick={() => void handleCreate()}
 				disabled={creating}
-				class="rounded bg-blue-950 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+				class="rounded bg-brand-primary px-4 py-2 text-sm text-white hover:opacity-90 disabled:opacity-50"
 			>
 				{creating ? 'Creating…' : 'Create'}
 			</button>

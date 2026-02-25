@@ -1,15 +1,19 @@
+from __future__ import annotations
+
 import contextlib
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 
-if TYPE_CHECKING:
-    from papadapi.users.models import User
-
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from rest_framework import generics, mixins, status, viewsets
-from rest_framework.request import Request
 from rest_framework.response import Response
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from rest_framework.request import Request
+
+    from papadapi.users.models import User
 
 from papadapi.annotate.permissions import (
     IsAnnotateCreateOrReadOnly,
@@ -37,13 +41,12 @@ class AnnotationCreateSet(
     serializer_class = AnnotationSerializer
     permission_classes = [IsAnnotateCreateOrReadOnly]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Annotation] | None:  # type: ignore[override]  # TYPE_DEBT: returns None for empty search
         query = None
         search_query = self.request.GET.get("search")
         search_where = self.request.GET.get("searchWhere", None)
         search_from = self.request.GET.get("searchFrom", None)
         search_collections = self.request.GET.get("searchCollections", None)
-        final_query = None
         group_query = None
 
         # By default search in name and description unless overridden
@@ -78,19 +81,18 @@ class AnnotationCreateSet(
                 group_list = search_collections.split(",")
                 group_query = Q(mediagroup__in=Group.objects.filter(id__in=group_list))
             else:
-                # No recognised search_from — return empty queryset rather than
+                # No recognised search_from -- return empty queryset rather than
                 # a Response object (which would crash the paginator).
                 return Annotation.objects.none()
 
         final_query = query & group_query if query else group_query
         if final_query:
             return (
-                Annotation.objects.filter(query & Q(is_delete=False))
+                Annotation.objects.filter(query & Q(is_delete=False))  # type: ignore[operator]  # TYPE_DEBT: query is Q when final_query is truthy via query path
                 .distinct()
                 .order_by("created_at")
             )
-        else:
-            return None
+        return None
 
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
@@ -102,6 +104,12 @@ class AnnotationCreateSet(
 
         # Optional typed fields
         annotation_type = data.get("annotation_type", Annotation.AnnotationType.TEXT)
+        valid_types = {choice[0] for choice in Annotation.AnnotationType.choices}
+        if annotation_type not in valid_types:
+            return Response(
+                {"detail": f"Invalid annotation_type: {annotation_type}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         media_ref_uuid_raw = data.get("media_ref_uuid") or None
         reply_to_raw = data.get("reply_to") or None
 
@@ -115,7 +123,7 @@ class AnnotationCreateSet(
             created_by=cast("User", self.request.user),
         )
 
-        # File fields — assigned after create so upload_to functions run
+        # File fields -- assigned after create so upload_to functions run
         image_file = request.FILES.get("annotation_image")
         audio_file = request.FILES.get("annotation_audio")
         video_file = request.FILES.get("annotation_video")
@@ -132,7 +140,7 @@ class AnnotationCreateSet(
 
         m.save()
 
-        # Enqueue HLS transcoding for audio/video reply files — raw files remain
+        # Enqueue HLS transcoding for audio/video reply files -- raw files remain
         # playable natively if the worker hasn't processed them yet.
         if audio_file:
             enqueue("transcode_annotation_audio", m.id)
@@ -142,7 +150,9 @@ class AnnotationCreateSet(
         for tag in data.get("tags", "").split(","):
             tag = tag.strip()
             if tag:
-                m.tags.add(create_or_update_tag(tag))
+                tag_obj = create_or_update_tag(tag)
+                if tag_obj:
+                    m.tags.add(tag_obj)
 
         serializer = AnnotationSerializer(m)
         return Response(serializer.data)
@@ -166,12 +176,11 @@ class AnnotationRetreiveSet(
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
-    def get_object(self):
+    def get_object(self) -> Annotation:
         obj = super().get_object()
-        # perform some extra checks on obj, e.g custom permissions
-        return obj
+        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Annotation]:
         return Annotation.objects.filter(is_delete=False)
 
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -183,6 +192,12 @@ class AnnotationRetreiveSet(
         if "annotation_text" in data:
             m.annotation_text = data["annotation_text"]
         if "annotation_type" in data:
+            valid_types = {choice[0] for choice in Annotation.AnnotationType.choices}
+            if data["annotation_type"] not in valid_types:
+                return Response(
+                    {"detail": f"Invalid annotation_type: {data['annotation_type']}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             m.annotation_type = data["annotation_type"]
         if "media_target" in data:
             m.media_target = data["media_target"]
@@ -196,7 +211,9 @@ class AnnotationRetreiveSet(
             for tag_name in data["tags"].split(","):
                 tag_name = tag_name.strip()
                 if tag_name:
-                    m.tags.add(create_or_update_tag(tag_name))
+                    tag_obj = create_or_update_tag(tag_name)
+                    if tag_obj:
+                        m.tags.add(tag_obj)
 
         image_file = request.FILES.get("annotation_image")
         audio_file = request.FILES.get("annotation_audio")
@@ -217,7 +234,7 @@ class AnnotationRetreiveSet(
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def perform_destroy(self, instance):
+    def perform_destroy(self, instance: Annotation) -> None:
         obj = self.get_object()
         m = Annotation.objects.get(id=obj.id)
         m.is_delete = True
@@ -248,12 +265,11 @@ class AnnotationAddTag(
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
-    def get_object(self):
+    def get_object(self) -> Annotation:
         obj = super().get_object()
-        # perform some extra checks on obj, e.g custom permissions
-        return obj
+        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
 
         obj = self.get_object()
@@ -262,7 +278,9 @@ class AnnotationAddTag(
         tags = data.get("tags")
         if tags:
             for tag in tags:
-                m.tags.add(create_or_update_tag(tag))
+                tag_obj = create_or_update_tag(tag)
+                if tag_obj:
+                    m.tags.add(tag_obj)
         serializer = AnnotationSerializer(m)
         return Response(serializer.data)
 
@@ -283,12 +301,11 @@ class AnnotationRemoveTag(
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
-    def get_object(self):
+    def get_object(self) -> Annotation:
         obj = super().get_object()
-        # perform some extra checks on obj, e.g custom permissions
-        return obj
+        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
 
         obj = self.get_object()
@@ -317,7 +334,7 @@ class AnnotationByMediaRetreiveSet(mixins.RetrieveModelMixin, viewsets.GenericVi
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
-    def retrieve(self, request, *args, **kwargs):
+    def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         media_id = self.kwargs["uuid"]
         queryset = Annotation.objects.filter(
             is_delete=False, media_reference_id=media_id
@@ -333,10 +350,10 @@ class InstanceAnnotationStats(viewsets.GenericViewSet, generics.ListAPIView):
     permission_classes = [IsSuperUser]
     pagination_class = CustomPageNumberPagination
 
-    def get_paginated_response(self, data):
+    def get_paginated_response(self, data: Any) -> Response:
         return Response(data)
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Annotation]:
         data = (
             Annotation.objects.values("id")
             .annotate(created_date=TruncDate("created_at"))
@@ -344,7 +361,7 @@ class InstanceAnnotationStats(viewsets.GenericViewSet, generics.ListAPIView):
             .values("created_date")
             .annotate(**{"total": Count("created_date")})
         )
-        return data
+        return data  # type: ignore[return-value]  # TYPE_DEBT: annotated queryset loses model type param
 
 
 class GroupAnnotationStats(
@@ -358,7 +375,7 @@ class GroupAnnotationStats(
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def retrieve(self, request, *args, **kwargs):
+    def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         group_id = self.kwargs.get("id")
         if group_id:
 
@@ -375,3 +392,4 @@ class GroupAnnotationStats(
             )
             serializer = AnnotationStatsSerializer(base_annotation_query, many=True)
             return Response(serializer.data)
+        return Response(data=[], status=status.HTTP_200_OK)

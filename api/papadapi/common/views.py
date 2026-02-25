@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import json
+from typing import TYPE_CHECKING, Any
 
 from django.db.models import Count, F, Q, Value
 from django.db.models.functions import TruncDate
@@ -10,6 +13,10 @@ from rest_framework.permissions import (
 )
 from rest_framework.renderers import TemplateHTMLRenderer
 from rest_framework.response import Response
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from rest_framework.request import Request
 
 from papadapi.annotate.models import Annotation
 from papadapi.archive.models import MediaStore
@@ -29,8 +36,7 @@ from .serializers import (
 
 
 class TagsViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
-):
+    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     List all tags
     """
@@ -40,10 +46,10 @@ class TagsViewSet(
     pagination_class = CustomPageNumberPagination
     permission_classes = [IsAuthenticatedOrReadOnly]
 
-    def get_paginated_response(self, data):
+    def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         return Response(data)
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         if self.request.user.is_anonymous:
             selected_groups = Group.objects.filter(is_active=True, is_public=True)
         else:
@@ -79,8 +85,7 @@ class TagsViewSet(
 
 
 class GroupViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
-):
+    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     List all tags
     """
@@ -90,7 +95,7 @@ class GroupViewSet(
     pagination_class = CustomPageNumberPagination
     permission_classes = [IsAuthenticatedOrReadOnly]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Group]:
         if self.request.user.is_anonymous:
             return Group.objects.filter(is_public=True, is_active=True)
         else:
@@ -99,7 +104,7 @@ class GroupViewSet(
                 users__in=[user]
             )
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         name = data["name"]
         description = data["description"]
@@ -128,7 +133,7 @@ class GroupViewSet(
                 )
                 q.save()
                 g.extra_group_questions.add(q)
-        g.users.add(request.user)
+        g.users.add(request.user)  # type: ignore[arg-type]  # TYPE_DEBT: view requires auth; user is always User
         if data["users"]:
             users = data["users"].split(",")
             if len(data["users"]) > 0:
@@ -141,8 +146,7 @@ class GroupViewSet(
 
 
 class UpdateGroupViewSet(
-    mixins.UpdateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
-):
+    mixins.UpdateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
     List all tags
     """
@@ -154,7 +158,7 @@ class UpdateGroupViewSet(
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         obj = self.get_object()
 
@@ -179,8 +183,7 @@ class UpdateGroupViewSet(
         return Response(serializer.data)
 
 class AddUserFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
-):
+    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """
     List all tags
     """
@@ -192,7 +195,7 @@ class AddUserFromGroupView(
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         obj = self.get_object()
 
@@ -206,8 +209,7 @@ class AddUserFromGroupView(
 
 
 class RemoveUserFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
-):
+    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """
     List all tags
     """
@@ -219,7 +221,7 @@ class RemoveUserFromGroupView(
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         obj = self.get_object()
 
@@ -243,8 +245,7 @@ class RemoveUserFromGroupView(
 
 
 class RemoveCustomQuestionFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
-):
+    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
 
     """
     Remove a custom question from group
@@ -257,7 +258,7 @@ class RemoveCustomQuestionFromGroupView(
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         obj = self.get_object()
 
@@ -268,17 +269,18 @@ class RemoveCustomQuestionFromGroupView(
         if data["remove_existing_data"] == "True":
             media_list = MediaStore.objects.filter(group=g)
             for media in media_list:
-                for resp in media.extra_group_response:
+                egr: list[dict[str, Any]] = media.extra_group_response or []
+                for resp in egr:
                     if question.id == int(resp["question_id"]):
-                        media.extra_group_response.remove(resp)
+                        egr.remove(resp)
+                    media.extra_group_response = egr
                     media.save()
         serializer = UpdateGroupSerializer(g)
         return Response(serializer.data)
 
 
 class AddCustomQuestionFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
-):
+    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
 
     queryset = Group.objects.all()
     serializer_class = UpdateGroupSerializer
@@ -287,7 +289,7 @@ class AddCustomQuestionFromGroupView(
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         obj = self.get_object()
 
@@ -302,7 +304,8 @@ class AddCustomQuestionFromGroupView(
         if data["add_default_value"] == "True":
             media_list = MediaStore.objects.filter(group=g)
             for media in media_list:
-                media.extra_group_response.append(
+                egr: list[dict[str, Any]] = media.extra_group_response or []
+                egr.append(
                     {
                         "question_id": question.id,
                         "question": question.question,
@@ -311,6 +314,7 @@ class AddCustomQuestionFromGroupView(
                         "response": data.get("default_value", ""),
                     }
                 )
+                media.extra_group_response = egr
                 media.save()
 
         serializer = UpdateGroupSerializer(g)
@@ -318,8 +322,7 @@ class AddCustomQuestionFromGroupView(
 
 
 class UpdateCustomQuestionFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
-):
+    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
 
     queryset = Group.objects.all()
     serializer_class = UpdateGroupSerializer
@@ -328,7 +331,7 @@ class UpdateCustomQuestionFromGroupView(
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         obj = self.get_object()
 
@@ -345,9 +348,11 @@ class UpdateCustomQuestionFromGroupView(
         q.save()
         media_list = MediaStore.objects.filter(group=g)
         for media in media_list:
-            for resp in media.extra_group_response:
+            egr: list[dict[str, Any]] = media.extra_group_response or []
+            for resp in egr:
                 if q.id == int(resp["question_id"]):
                     resp["question"] = q.question
+                media.extra_group_response = egr
                 media.save()
         serializer = UpdateGroupSerializer(g)
         return Response(serializer.data)
@@ -360,10 +365,10 @@ class InstanceGroupStats(viewsets.GenericViewSet, generics.ListAPIView):
     pagination_class = CustomPageNumberPagination
     permission_classes = [IsSuperUser]
 
-    def get_paginated_response(self, data):
+    def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         return Response(data)
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Group]:
         data = (
             Group.objects.values("id")
             .annotate(created_date=TruncDate("created_at"))
@@ -371,7 +376,7 @@ class InstanceGroupStats(viewsets.GenericViewSet, generics.ListAPIView):
             .values("created_date")
             .annotate(**{"total": Count("created_date")})
         )
-        return data
+        return data  # type: ignore[return-value]
 
 
 class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
@@ -382,10 +387,10 @@ class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def get_paginated_response(self, data):
+    def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         return Response(data)
 
-    def retrieve(self, request, *args, **kwargs):
+    def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         group_id = self.kwargs.get("id")
         if group_id:
             media_tags_count = (
@@ -419,7 +424,7 @@ class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
             )
 
             ## Now generate the links
-            links = []
+            links: list[dict[str, int]] = []
             for tc in tags_count:
                 tcid = tc["id"]
                 links += get_related_tags(group_id, tcid, links)
@@ -432,20 +437,21 @@ class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
                     {"name": "Media+Annotation"},
                 ],
             })
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 class RedirectToUIView(generics.GenericAPIView):
     renderer_classes = [TemplateHTMLRenderer]
     permission_classes = [AllowAny]
 
-    def get(self, request, *args, **kwargs):
-        return redirect("/ui" + request.path)
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        return redirect("/ui" + request.path)  # type: ignore[return-value]
 
 
 class HealthCheck(generics.GenericAPIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         return Response(status=200)
 
 
@@ -460,7 +466,7 @@ class RuntimeConfigView(generics.GenericAPIView):
 
     permission_classes = [AllowAny]
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from django.conf import settings
 
         return Response(

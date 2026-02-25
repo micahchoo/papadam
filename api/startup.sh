@@ -16,9 +16,9 @@ python manage-prod.py collectstatic --noinput
 echo '{"level":"info","msg":"starting gunicorn","port":"'"$PORT"'"}'
 exec gunicorn \
   --bind "0.0.0.0:${PORT}" \
-  --forwarded-allow-ips="*" \
+  --forwarded-allow-ips="${FORWARDED_ALLOW_IPS:-172.16.0.0/12,192.168.0.0/16,10.0.0.0/8}" \
   --workers=4 \
-  --timeout=0 \
+  --timeout=120 \
   --preload \
   --access-logfile=- \
   --error-logfile=- \

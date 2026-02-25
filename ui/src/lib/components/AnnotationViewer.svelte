@@ -2,7 +2,7 @@
 	import DOMPurify from 'dompurify';
 	import { annotations as annoApi, mediaRelation } from '$lib/api';
 	import type { Annotation } from '$lib/api';
-	import { currentUser } from '$lib/stores';
+	import { currentUser, defaultQuality, dateLocale } from '$lib/stores';
 	import AnnotationMedia from '$lib/components/primitives/AnnotationMedia.svelte';
 
 	interface Props {
@@ -18,6 +18,11 @@
 		formatTime = defaultFormatTime,
 		onAnnotationDeleted
 	}: Props = $props();
+
+	/** Map UIConfig quality to HLS.js startLevel for annotation media. */
+	const hlsStartLevel = $derived(
+		$defaultQuality === 'low' ? 0 : $defaultQuality === 'high' ? Infinity : -1
+	);
 
 	function defaultFormatTime(seconds: number): string {
 		if (isNaN(seconds)) return '00:00';
@@ -120,14 +125,14 @@
 
 	const TYPE_BADGE: Record<string, string> = {
 		text: 'bg-gray-100 text-gray-600',
-		image: 'bg-blue-100 text-blue-700',
+		image: 'bg-cyan-100 text-cyan-700',
 		audio: 'bg-green-100 text-green-700',
 		video: 'bg-purple-100 text-purple-700',
 		media_ref: 'bg-orange-100 text-orange-700'
 	};
 
 	function formatDate(iso: string): string {
-		return new Date(iso).toLocaleDateString('en-GB', {
+		return new Date(iso).toLocaleDateString($dateLocale, {
 			day: 'numeric',
 			month: 'short',
 			year: 'numeric'
@@ -149,7 +154,7 @@
 						<p>
 							<strong>Timestamp:</strong>
 							<span
-								class="cursor-pointer text-blue-500 underline"
+								class="cursor-pointer text-blue-600 underline"
 								role="button"
 								tabindex="0"
 								onclick={() => {
@@ -176,9 +181,9 @@
 							class="mt-2 max-w-full rounded border border-gray-200"
 						/>
 					{:else if annotation.annotation_type === 'audio' && annotation.annotation_audio}
-						<AnnotationMedia src={annotation.annotation_audio} mediaType="audio" />
+						<AnnotationMedia src={annotation.annotation_audio} mediaType="audio" hlsStartLevel={hlsStartLevel} />
 					{:else if annotation.annotation_type === 'video' && annotation.annotation_video}
-						<AnnotationMedia src={annotation.annotation_video} mediaType="video" />
+						<AnnotationMedia src={annotation.annotation_video} mediaType="video" hlsStartLevel={hlsStartLevel} />
 					{:else if annotation.annotation_type === 'media_ref' && annotation.media_ref_uuid}
 						<p class="mt-2 text-sm text-gray-500">
 							Linked media: <code class="font-mono text-xs">{annotation.media_ref_uuid}</code>
@@ -244,7 +249,7 @@
 							<button
 								onclick={() => void handleReply(annotation)}
 								disabled={submittingReply}
-								class="mt-1 rounded bg-blue-950 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+								class="mt-1 rounded bg-brand-primary px-3 py-1.5 text-sm text-white hover:opacity-90 disabled:opacity-50"
 							>
 								{submittingReply ? 'Posting…' : 'Post Reply'}
 							</button>

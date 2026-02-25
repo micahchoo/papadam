@@ -9,17 +9,20 @@
  */
 
 import { writable, derived } from 'svelte/store';
-import type { UIConfig, User, Group, MediaStore, AnnotationType, TimeRangeInput } from '$lib/api';
+import type {
+	UIConfig,
+	User,
+	Group,
+	MediaStore,
+	AnnotationType,
+	MediaQuality,
+	TimeRangeInput
+} from '$lib/api';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 /** Authenticated user, null when logged out. */
 export const currentUser = writable<User | null>(null);
-
-/** Raw access token — kept in sync with localStorage by +layout.svelte. */
-export const accessToken = writable<string | null>(
-	typeof localStorage !== 'undefined' ? localStorage.getItem('access_token') : null
-);
 
 /** True when a user object is loaded. */
 export const isAuthenticated = derived(currentUser, ($u) => $u !== null);
@@ -46,10 +49,7 @@ export const groupMediaList = writable<MediaStore[]>([]);
  */
 export const selectedGroupMedia = groupMediaList;
 
-// ── Single media item context ─────────────────────────────────────────────────
-
-/** The media item currently open in the player. */
-export const selectedMedia = writable<MediaStore | null>(null);
+// ── Playback state ───────────────────────────────────────────────────────────
 
 /**
  * Duration of the currently loaded media in seconds.
@@ -62,12 +62,6 @@ export const selectedMediaDuration = writable<number | null>(null);
  * Updated on timeupdate by the player; pushed to CRDT awareness by the route.
  */
 export const playbackPosition = writable<number>(0);
-
-// ── Modal visibility ──────────────────────────────────────────────────────────
-
-export const isUploadModalOpen = writable<boolean>(false);
-export const isAnnotateModalOpen = writable<boolean>(false);
-export const isEditMediaModalOpen = writable<boolean>(false);
 
 // ── UIConfig ──────────────────────────────────────────────────────────────────
 
@@ -107,4 +101,22 @@ export const timeRangeInputMode = derived(
 export const showTranscript = derived(
 	uiConfig,
 	($c): boolean => $c?.player_controls.show_transcript ?? false
+);
+
+/** Whether to show an audio waveform; default false. Renderer is Phase 5 — store exists for gating. */
+export const showWaveform = derived(
+	uiConfig,
+	($c): boolean => $c?.player_controls.show_waveform ?? false
+);
+
+/** Default HLS quality from UIConfig.player_controls; default 'auto'. */
+export const defaultQuality = derived(
+	uiConfig,
+	($c): MediaQuality => $c?.player_controls.default_quality ?? 'auto'
+);
+
+/** BCP-47 locale for date formatting from UIConfig.language; default 'en-GB'. */
+export const dateLocale = derived(
+	uiConfig,
+	($c): string => $c?.language || 'en-GB'
 );

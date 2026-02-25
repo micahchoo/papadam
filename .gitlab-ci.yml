@@ -10,9 +10,9 @@
 #   • 80% pytest coverage gate (configured in api/pyproject.toml)
 #   • package-lock.json must be committed before ui:* jobs run
 #
-# New apps currently enforced:
-#   events  crdt  exhibit  media_relation  annotate/tests
-# Expand NEW_APPS as each legacy module is fully migrated.
+# New/migrated apps currently enforced:
+#   events  crdt  exhibit  media_relation  users  importexport  common  archive  annotate
+# All legacy apps fully annotated -- no ANN exemptions remain.
 
 stages:
   - lint
@@ -84,12 +84,11 @@ api:ruff:
       papadapi/crdt/
       papadapi/exhibit/
       papadapi/media_relation/
-      papadapi/annotate/tasks.py
-      papadapi/annotate/tests/
-      papadapi/archive/tasks.py
-      papadapi/archive/tests.py
-      papadapi/importexport/tasks.py
-      papadapi/importexport/tests.py
+      papadapi/users/
+      papadapi/importexport/
+      papadapi/common/
+      papadapi/archive/
+      papadapi/annotate/
       papadapi/queue.py
       papadapi/worker.py
       papadapi/config/test.py
@@ -153,6 +152,16 @@ api:bandit:
       papadapi/queue.py
       -ll -c pyproject.toml
   allow_failure: false
+
+api:pip-audit:
+  extends:
+    - .api_base
+    - .api_changes
+  stage: lint
+  script:
+    - pip install --quiet pip-audit
+    - pip-audit -r requirements/requirements-prod.txt --strict
+  allow_failure: true
 
 # ── API · test ─────────────────────────────────────────────────────────────────
 

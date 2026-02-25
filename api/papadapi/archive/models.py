@@ -1,22 +1,28 @@
+from __future__ import annotations
+
 import hashlib
 import os
 import uuid
 from functools import partial
+from typing import TYPE_CHECKING
 
 from django.db import models
+
+if TYPE_CHECKING:
+    from typing import IO
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from djrichtextfield.models import RichTextField
 
 
-def hash_file(file, block_size=65536):
+def hash_file(file: IO[bytes], block_size: int = 65536) -> str:
     hasher = hashlib.md5(usedforsecurity=False)
     for buf in iter(partial(file.read, block_size), b""):
         hasher.update(buf)
     return hasher.hexdigest()
 
 
-def upload_to(instance, filename):
+def upload_to(instance: MediaStore, filename: str) -> str:
     """
     :type instance: dolphin.models.File
     """
@@ -114,8 +120,8 @@ class MediaStore(models.Model):
         verbose_name = _("MediaStore")
         verbose_name_plural = _("MediaStores")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.uuid)
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("MediaStore_detail", kwargs={"pk": self.pk})

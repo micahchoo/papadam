@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from django.db.models import Count, F
 from rest_framework import serializers
 from rest_framework.pagination import PageNumberPagination
@@ -15,7 +19,7 @@ class CustomPageNumberPagination(PageNumberPagination):
 
 
 class TagsSerializer(serializers.ModelSerializer):
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> Tags:
         tag = Tags.objects.create(**validated_data)
         return tag
 
@@ -25,7 +29,7 @@ class TagsSerializer(serializers.ModelSerializer):
 
 
 class QuestionsSerializer(serializers.ModelSerializer):
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> Question:
         question = Question.objects.create(**validated_data)
         return question
 
@@ -47,7 +51,7 @@ class GroupSerializer(serializers.ModelSerializer):
     media_count = serializers.SerializerMethodField()
     users_count = serializers.SerializerMethodField()
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> Group:
         group = Group.objects.create(**validated_data)
         return group
 
@@ -69,13 +73,13 @@ class GroupSerializer(serializers.ModelSerializer):
             "media_count"
         )
 
-    def get_media_count(self, obj):
+    def get_media_count(self, obj: Group) -> int:
         return MediaStore.objects.filter(group=obj.id).count()
 
-    def get_users_count(self, obj):
+    def get_users_count(self, obj: Group) -> int:
         return Group.objects.get(id=obj.id).users.count()
 
-    def get_tags(self, obj):
+    def get_tags(self, obj: Group) -> list[dict[str, Any]]:
         media_tags_count = (
             MediaStore.objects.filter(group=obj.id)
             .annotate(count=Count("tags"))
@@ -98,7 +102,7 @@ class GroupSerializer(serializers.ModelSerializer):
         tags_count = get_final_tags_count(
             list(media_tags_count), list(annotation_tags_count), count=True
         )
-        return GroupTagSerializer(tags_count, many=True).data
+        return GroupTagSerializer(tags_count, many=True).data  # type: ignore[return-value]
 
 
 class UpdateGroupSerializer(serializers.ModelSerializer):
@@ -121,7 +125,7 @@ class UpdateGroupSerializer(serializers.ModelSerializer):
             "updated_at"
         )
 
-    def get_tags(self, obj):
+    def get_tags(self, obj: Group) -> list[dict[str, Any]]:
         media_tags_count = (
             MediaStore.objects.filter(group=obj.id)
             .annotate(count=Count("tags"))
@@ -144,7 +148,7 @@ class UpdateGroupSerializer(serializers.ModelSerializer):
         tags_count = get_final_tags_count(
             list(media_tags_count), list(annotation_tags_count), count=True
         )
-        return GroupTagSerializer(tags_count, many=True).data
+        return GroupTagSerializer(tags_count, many=True).data  # type: ignore[return-value]
 
 
 class GroupStatsSerializer(serializers.Serializer):

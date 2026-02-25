@@ -2,6 +2,20 @@
 	import type { MediaStore } from '$lib/api';
 	import { selectedGroupMedia } from '$lib/stores';
 
+	type MediaTypeFilter = 'all' | 'audio' | 'video' | 'image';
+
+	const AUDIO_EXTS = new Set(['mp3', 'ogg', 'wav', 'flac', 'aac', 'm4a', 'wma', 'opus']);
+	const VIDEO_EXTS = new Set(['mp4', 'webm', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'm4v']);
+	const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff']);
+
+	function mediaTypeOf(ext: string): 'audio' | 'video' | 'image' | 'other' {
+		const e = ext.toLowerCase();
+		if (AUDIO_EXTS.has(e)) return 'audio';
+		if (VIDEO_EXTS.has(e)) return 'video';
+		if (IMAGE_EXTS.has(e)) return 'image';
+		return 'other';
+	}
+
 	interface Props {
 		sortedRecordings?: MediaStore[];
 		filteredRecordings?: MediaStore[];
@@ -11,6 +25,7 @@
 	let sortOrder = $state<'newest' | 'oldest' | 'ascending' | 'descending'>('newest');
 	let searchQuery = $state('');
 	let searchBy = $state<'name' | 'tags'>('name');
+	let mediaTypeFilter = $state<MediaTypeFilter>('all');
 
 	const sorted = $derived(
 		[...$selectedGroupMedia].sort((a, b) => {
@@ -25,6 +40,9 @@
 
 	const filtered = $derived(
 		sorted.filter((r) => {
+			if (mediaTypeFilter !== 'all' && mediaTypeOf(r.file_extension) !== mediaTypeFilter) {
+				return false;
+			}
 			if (searchBy === 'name') return r.name.toLowerCase().includes(searchQuery.toLowerCase());
 			const searchTags = searchQuery
 				.split(',')
@@ -59,18 +77,33 @@
 				class="w-4/5 rounded border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring focus:ring-blue-200"
 			/>
 		</div>
-		<div class="flex items-center">
-			<label for="sortOrder" class="mr-2 text-xs font-medium text-gray-600">Sort:</label>
-			<select
-				id="sortOrder"
-				bind:value={sortOrder}
-				class="rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-blue-200"
-			>
-				<option value="newest">Newest to Oldest</option>
-				<option value="oldest">Oldest to Newest</option>
-				<option value="ascending">Name Ascending</option>
-				<option value="descending">Name Descending</option>
-			</select>
+		<div class="flex items-center gap-3">
+			<div class="flex items-center">
+				<label for="mediaType" class="mr-2 text-xs font-medium text-gray-600">Type:</label>
+				<select
+					id="mediaType"
+					bind:value={mediaTypeFilter}
+					class="rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-blue-200"
+				>
+					<option value="all">All</option>
+					<option value="audio">Audio</option>
+					<option value="video">Video</option>
+					<option value="image">Image</option>
+				</select>
+			</div>
+			<div class="flex items-center">
+				<label for="sortOrder" class="mr-2 text-xs font-medium text-gray-600">Sort:</label>
+				<select
+					id="sortOrder"
+					bind:value={sortOrder}
+					class="rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-blue-200"
+				>
+					<option value="newest">Newest to Oldest</option>
+					<option value="oldest">Oldest to Newest</option>
+					<option value="ascending">Name Ascending</option>
+					<option value="descending">Name Descending</option>
+				</select>
+			</div>
 		</div>
 	</div>
 </div>

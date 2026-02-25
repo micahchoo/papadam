@@ -14,7 +14,7 @@ import type { InternalAxiosRequestConfig } from 'axios';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface User {
-	id: string;
+	id: number;
 	username: string;
 	first_name: string;
 	last_name: string;
@@ -139,14 +139,14 @@ export type UIConfigColorScheme = 'default' | 'warm' | 'cool' | 'high-contrast';
 export type MediaQuality = 'low' | 'medium' | 'high' | 'auto';
 export type TimeRangeInput = 'slider' | 'timestamp' | 'tap';
 
-export interface UIConfigPlayerControls {
+interface UIConfigPlayerControls {
 	skip_seconds: [number, number];
 	show_waveform: boolean;
 	show_transcript: boolean;
 	default_quality: MediaQuality;
 }
 
-export interface UIConfigAnnotations {
+interface UIConfigAnnotations {
 	allow_images: boolean;
 	allow_audio: boolean;
 	allow_video: boolean;
@@ -154,7 +154,7 @@ export interface UIConfigAnnotations {
 	time_range_input: TimeRangeInput;
 }
 
-export interface UIConfigExhibit {
+interface UIConfigExhibit {
 	enabled: boolean;
 }
 
@@ -181,6 +181,18 @@ export interface UIConfig {
  * for the HLS conversion task (null when no conversion is needed, e.g. unknown type).
  */
 export type MediaCreateResponse = MediaStore & { job_id: string | null };
+
+export interface IERequest {
+	request_id: string;
+	requested_at: string;
+	request_type: 'import' | 'export';
+	is_authorized: boolean;
+	is_complete: boolean;
+	ie_metadata: Record<string, unknown>;
+	completed_at: string;
+	detail: string | null;
+	requested_file: string | null;
+}
 
 export interface PaginatedResponse<T> {
 	count: number;
@@ -296,7 +308,7 @@ export const groups = {
 	update: (id: number, payload: Partial<Group>) =>
 		http.patch<Group>(`/api/v1/group/${id}/`, payload),
 
-	delete: (id: number) => http.delete(`/api/v1/group/${id}/`)
+	delete: (id: number) => http.delete<void>(`/api/v1/group/${id}/`)
 };
 
 // ── Archive (media) ───────────────────────────────────────────────────────────
@@ -328,7 +340,7 @@ export const archive = {
 			headers: { 'Content-Type': 'multipart/form-data' }
 		}),
 
-	delete: (uuid: string) => http.delete(`/api/v1/archive/${uuid}/`)
+	delete: (uuid: string) => http.delete<void>(`/api/v1/archive/${uuid}/`)
 };
 
 // ── Annotations ───────────────────────────────────────────────────────────────
@@ -361,13 +373,13 @@ export const annotations = {
 			headers: { 'Content-Type': 'multipart/form-data' }
 		}),
 
-	delete: (uuid: string) => http.delete(`/api/v1/annotate/${uuid}/`),
+	delete: (uuid: string) => http.delete<void>(`/api/v1/annotate/${uuid}/`),
 
 	addTag: (uuid: string, tagName: string) =>
-		http.post(`/api/v1/annotate/${uuid}/add_tag/`, { tag: tagName }),
+		http.post<Annotation>(`/api/v1/annotate/${uuid}/add_tag/`, { tag: tagName }),
 
 	removeTag: (uuid: string, tagName: string) =>
-		http.post(`/api/v1/annotate/${uuid}/remove_tag/`, { tag: tagName })
+		http.post<Annotation>(`/api/v1/annotate/${uuid}/remove_tag/`, { tag: tagName })
 };
 
 // ── Tags ──────────────────────────────────────────────────────────────────────
@@ -389,13 +401,9 @@ export const exhibits = {
 	update: (uuid: string, payload: Partial<Exhibit>) =>
 		http.patch<Exhibit>(`/api/v1/exhibit/${uuid}/`, payload),
 
-	delete: (uuid: string) => http.delete(`/api/v1/exhibit/${uuid}/`),
+	delete: (uuid: string) => http.delete<void>(`/api/v1/exhibit/${uuid}/`),
 
 	blocks: {
-		/** GET /api/v1/exhibit/<uuid>/blocks/ — ordered block list */
-		list: (exhibitUuid: string) =>
-			http.get<ExhibitBlock[]>(`/api/v1/exhibit/${exhibitUuid}/blocks/`),
-
 		/** POST /api/v1/exhibit/<uuid>/blocks/ — append a block */
 		create: (
 			exhibitUuid: string,
@@ -407,7 +415,7 @@ export const exhibits = {
 
 		/** DELETE /api/v1/exhibit/<uuid>/blocks/<id>/ — remove a block */
 		delete: (exhibitUuid: string, blockId: number) =>
-			http.delete(`/api/v1/exhibit/${exhibitUuid}/blocks/${blockId}/`),
+			http.delete<void>(`/api/v1/exhibit/${exhibitUuid}/blocks/${blockId}/`),
 
 		/**
 		 * POST /api/v1/exhibit/<uuid>/blocks/reorder/
@@ -432,7 +440,7 @@ export const crdt = {
 
 	/** Persist binary Y.js state delta */
 	saveState: (mediaUuid: string, binary: Uint8Array) =>
-		http.put(`/api/v1/crdt/${mediaUuid}/`, binary, {
+		http.put<void>(`/api/v1/crdt/${mediaUuid}/`, binary, {
 			headers: { 'Content-Type': 'application/octet-stream' }
 		})
 };
@@ -485,12 +493,13 @@ export const uiconfig = {
 // ── Import / Export ───────────────────────────────────────────────────────────
 
 export const importexport = {
-	requestExport: (groupId: number) => http.post('/api/v1/export/', { group: groupId }),
+	requestExport: (groupId: number) =>
+		http.post<IERequest>('/api/v1/export/', { group: groupId }),
 
 	requestImport: (formData: FormData) =>
-		http.post('/api/v1/import/', formData, {
+		http.post<IERequest>('/api/v1/import/', formData, {
 			headers: { 'Content-Type': 'multipart/form-data' }
 		}),
 
-	listRequests: () => http.get('/api/v1/myierequests/')
+	listRequests: () => http.get<PaginatedResponse<IERequest>>('/api/v1/myierequests/')
 };

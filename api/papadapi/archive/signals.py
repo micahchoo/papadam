@@ -1,9 +1,10 @@
 """
 archive/signals.py — custom signals fired by the archive app.
 
-Signals are the clean way to let higher-level apps (annotate, exhibit, …)
+Signals are the clean way to let higher-level apps (annotate, exhibit, ...)
 react to archive events without creating an upward import dependency.
 """
+from __future__ import annotations
 
 from django.dispatch import Signal
 

@@ -12,20 +12,23 @@
 
 	const i18n = createI18n(runtime);
 	const { children }: { children: Snippet } = $props();
+	let layoutReady = $state(false);
 
 	onMount(async () => {
 		await loadConfig();
 		const token = localStorage.getItem('access_token');
-		if (token) {
-			try {
-				const { data } = await auth.me();
-				currentUser.set(data);
-			} catch {
-				localStorage.removeItem('access_token');
-				localStorage.removeItem('refresh_token');
-			}
-		}
-		const cfg = await loadUIConfig();
+		// auth.me() and loadUIConfig() are independent — run concurrently
+		const [, cfg] = await Promise.all([
+			token
+				? auth.me().then(({ data }) => {
+						currentUser.set(data);
+					}).catch(() => {
+						localStorage.removeItem('access_token');
+						localStorage.removeItem('refresh_token');
+					})
+				: Promise.resolve(),
+			loadUIConfig()
+		]);
 		if (cfg) {
 			uiConfig.set(cfg);
 			const root = document.documentElement;
@@ -40,6 +43,7 @@
 				delete root.dataset['voice'];
 			}
 		}
+		layoutReady = true;
 	});
 </script>
 
@@ -47,8 +51,14 @@
 	<NavBar />
 
 	<!-- Main Content -->
-	<main class="min-h-screen bg-gray-100">
-		{@render children()}
+	<main class="min-h-screen bg-[var(--scheme-bg,#f3f4f6)]">
+		{#if layoutReady}
+			{@render children()}
+		{:else}
+			<div class="flex min-h-[60vh] items-center justify-center">
+				<p class="text-sm text-gray-400">Loading…</p>
+			</div>
+		{/if}
 	</main>
 
 	<footer class="w-screen bg-gray-900 p-10 text-gray-400">

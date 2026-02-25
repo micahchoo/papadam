@@ -5,7 +5,7 @@
 	import DOMPurify from 'dompurify';
 	import { archive, annotations as annoApi } from '$lib/api';
 	import type { MediaStore, Annotation } from '$lib/api';
-	import { showTranscript } from '$lib/stores';
+	import { showTranscript, dateLocale } from '$lib/stores';
 	import AnnotationViewer from '$lib/components/AnnotationViewer.svelte';
 	import MediaPlayer from '$lib/components/MediaPlayer.svelte';
 	import type { ImageAnnotation } from '$lib/components/MediaPlayer.svelte';
@@ -48,16 +48,19 @@
 
 	onMount(async () => {
 		try {
-			const [mediaResp, annoResp] = await Promise.all([
-				archive.get(mediaUuid),
-				annoApi.byMedia(mediaUuid)
-			]);
+			const mediaResp = await archive.get(mediaUuid);
 			recording = mediaResp.data;
-			annotations = annoResp.data;
 		} catch {
 			error = 'Failed to load media.';
 		} finally {
 			loading = false;
+		}
+		// Load annotations independently — don't block player render
+		try {
+			const annoResp = await annoApi.byMedia(mediaUuid);
+			annotations = annoResp.data;
+		} catch {
+			// Annotations fail silently — player still works
 		}
 	});
 
@@ -131,6 +134,11 @@
 		<span>{error}</span>
 	</div>
 {:else if recording}
+	{#if error}
+		<div class="mx-4 mt-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
+			<span>{error}</span>
+		</div>
+	{/if}
 	<div class="mx-auto flex h-full max-w-5xl flex-col md:h-screen md:flex-row">
 		<!-- Left: player + metadata -->
 		<div class="w-full flex-shrink-0 overflow-y-auto p-6 md:w-1/2">
@@ -160,13 +168,19 @@
 				{/if}
 			</div>
 
-			<MediaPlayer
-				bind:this={mediaPlayerRef}
-				src={recording.upload ?? ''}
-				controls={true}
-				{imageAnnotations}
-				transcriptUrl={recording.transcript_vtt_url}
-			/>
+			{#if recording.upload}
+				<MediaPlayer
+					bind:this={mediaPlayerRef}
+					src={recording.upload}
+					controls={true}
+					{imageAnnotations}
+					transcriptUrl={recording.transcript_vtt_url}
+				/>
+			{:else}
+				<div class="flex h-48 items-center justify-center rounded bg-gray-200 text-sm text-gray-600">
+					Media is being processed. Refresh the page to check progress.
+				</div>
+			{/if}
 			{#if $showTranscript && recording.transcript_vtt_url}
 				<div class="mt-3">
 					{#if transcriptText === null}
@@ -193,13 +207,13 @@
 
 			<h1 class="mt-4 text-2xl font-bold">{recording.name}</h1>
 			<p class="text-sm text-gray-500">
-				{new Date(recording.created_at).toLocaleDateString('en-GB')}
+				{new Date(recording.created_at).toLocaleDateString($dateLocale)}
 			</p>
 			<div class="py-2">
 				{#each recording.tags as tag}
 					{#if tag.name && tag.count > 0 && tag.name.length <= 30}
 						<span
-							class="mr-1 inline-flex bg-blue-200 px-2 py-1 text-xs font-semibold uppercase text-blue-500"
+							class="mr-1 inline-flex bg-gray-200 px-2 py-1 text-xs font-semibold uppercase text-gray-600"
 						>
 							{tag.name}
 						</span>
@@ -216,7 +230,7 @@
 				<div class="sticky top-0 z-10 flex flex-col bg-gray-100">
 					<h3 class="py-4 text-lg font-semibold">Annotations</h3>
 					<button
-						class="mb-4 rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600 md:w-1/2"
+						class="mb-4 rounded bg-brand-accent px-4 py-2 text-white hover:opacity-90 md:w-1/2"
 						onclick={() => (showAnnotationModal = true)}
 					>
 						+ Create Annotation

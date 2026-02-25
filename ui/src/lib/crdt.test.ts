@@ -17,7 +17,7 @@ import {
 	getAwarenessStates,
 	type Awareness
 } from '$lib/crdt';
-import { selectedMediaDuration } from '$lib/stores';
+import { playbackPosition } from '$lib/stores';
 
 const OPTS = { wsUrl: 'ws://localhost:1234', token: 'tok', userId: 'u1', username: 'alice' };
 
@@ -259,7 +259,7 @@ describe('setAwarenessCursor', () => {
 		openMediaDoc(UUID, OPTS).destroy();
 	});
 
-	it('updates setLocalState with new cursor and pushes to selectedMediaDuration store', () => {
+	it('updates setLocalState with new cursor and pushes to playbackPosition store', () => {
 		const doc = openMediaDoc(UUID, OPTS);
 
 		setAwarenessCursor(UUID, 42.5);
@@ -268,8 +268,8 @@ describe('setAwarenessCursor', () => {
 		expect(doc.awareness!.setLocalState).toHaveBeenCalledWith(
 			expect.objectContaining({ cursor: 42.5 })
 		);
-		// selectedMediaDuration Svelte store should reflect the new position
-		expect(get(selectedMediaDuration)).toBe(42.5);
+		// playbackPosition Svelte store should reflect the new position
+		expect(get(playbackPosition)).toBe(42.5);
 	});
 
 	it('is a no-op for an unknown media UUID', () => {

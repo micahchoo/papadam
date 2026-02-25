@@ -3,20 +3,40 @@
 import uuid
 
 import pytest
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
 
+from papadapi.conftest import MediaStoreFactory, UserFactory
 from papadapi.exhibit.models import Exhibit, ExhibitBlock
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
-def exhibit(db, group, user):
+def exhibit(db, group_with_member, user):
     return Exhibit.objects.create(
         title="Test Exhibit",
         description="desc",
-        group=group,
+        group=group_with_member,
         created_by=user,
         is_public=True,
     )
+
+
+@pytest.fixture
+def media(db, group_with_member):
+    """MediaStore in the same group as the exhibit."""
+    return MediaStoreFactory(group=group_with_member)
+
+
+@pytest.fixture
+def outsider_client(db):
+    """Client authenticated as a user who is NOT a member of any group."""
+    outsider = UserFactory()
+    client = APIClient()
+    refresh = RefreshToken.for_user(outsider)
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    return client
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
@@ -285,3 +305,38 @@ def test_exhibit_delete_cascades_blocks(auth_client, exhibit, media):
     )
     auth_client.delete(f"/api/v1/exhibit/{exhibit.uuid}/")
     assert ExhibitBlock.objects.filter(exhibit=exhibit).count() == 0
+
+
+# ── Object-level group membership permission ─────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_exhibit_update_requires_group_membership(outsider_client, exhibit):
+    """Authenticated user who is NOT a member of the exhibit's group cannot edit."""
+    resp = outsider_client.patch(
+        f"/api/v1/exhibit/{exhibit.uuid}/",
+        data={"title": "Hacked"},
+        format="json",
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_exhibit_update_allowed_for_group_member(auth_client, exhibit):
+    """Member of the exhibit's group CAN edit."""
+    resp = auth_client.patch(
+        f"/api/v1/exhibit/{exhibit.uuid}/",
+        data={"title": "Renamed by member"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    exhibit.refresh_from_db()
+    assert exhibit.title == "Renamed by member"
+
+
+@pytest.mark.django_db
+def test_exhibit_delete_requires_group_membership(outsider_client, exhibit):
+    """Authenticated non-member cannot delete the exhibit."""
+    resp = outsider_client.delete(f"/api/v1/exhibit/{exhibit.uuid}/")
+    assert resp.status_code == 403
+    assert Exhibit.objects.filter(uuid=exhibit.uuid).exists()

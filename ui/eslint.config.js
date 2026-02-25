@@ -116,6 +116,7 @@ export default [
 				{ type: 'crdt', pattern: 'src/lib/crdt.ts' },
 				{ type: 'config', pattern: 'src/lib/config.ts' },
 				{ type: 'stores', pattern: 'src/lib/stores.ts' },
+				{ type: 'hls', pattern: 'src/lib/hls.ts' },
 				{ type: 'i18n', pattern: 'src/lib/i18n/**' },
 				{ type: 'primitives', pattern: 'src/lib/components/primitives/**' },
 				{ type: 'components', pattern: 'src/lib/components/**' },
@@ -144,16 +145,19 @@ export default [
 						// domain types (User, Group, MediaStore) from api (type-only at runtime)
 						{ from: 'stores', allow: ['config', 'crdt', 'api'] },
 
+						// hls.ts is a leaf — pure HLS utility, no internal imports
+						{ from: 'hls', allow: [] },
+
 						// i18n is a leaf — no internal imports
 						{ from: 'i18n', allow: [] },
 
-						// primitives: unstyled components, no business logic
-						{ from: 'primitives', allow: [] },
+						// primitives: unstyled components, may use hls utility
+						{ from: 'primitives', allow: ['hls'] },
 
 						// components: full access to lib layer (including events for upload progress)
 						{
 							from: 'components',
-							allow: ['api', 'stores', 'config', 'events', 'i18n', 'primitives']
+							allow: ['api', 'stores', 'config', 'events', 'i18n', 'primitives', 'hls']
 						},
 
 						// routes: full access to everything
@@ -166,6 +170,7 @@ export default [
 								'config',
 								'stores',
 								'i18n',
+								'hls',
 								'primitives',
 								'components'
 							]

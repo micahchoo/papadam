@@ -7,7 +7,7 @@ from django.db import models
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.username
 
     REQUIRED_FIELDS = ["first_name", "last_name"]

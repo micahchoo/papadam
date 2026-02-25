@@ -4,18 +4,18 @@
 
 <section
 	id="cover"
-	class="flex h-[90vh] w-screen bg-gray-100 p-4 pb-72 pt-10 md:items-center md:justify-center md:p-1"
+	class="flex h-[90vh] w-screen bg-[var(--scheme-bg,#f3f4f6)] p-4 pb-72 pt-10 md:items-center md:justify-center md:p-1"
 >
 	<div
 		class="flex flex-col items-center justify-center gap-x-10 rounded-lg p-10 pt-40 md:flex-row md:p-32"
 	>
 		<!-- Image Section -->
 		<div class="flex-shrink-0">
-			<img class="h-40 md:h-52" src="/img/Frame 4.png" alt="Sankalana Logo" />
+			<img class="h-40 md:h-52" src={$uiConfig?.brand_logo_url || '/img/Frame 4.png'} alt={$uiConfig?.brand_name ?? 'Logo'} />
 		</div>
 		<!-- Text Section -->
 		<div class="text-center md:text-left">
-			<h1 class="my-5 text-4xl font-black text-blue-100 md:text-7xl">
+			<h1 class="my-5 text-4xl font-black text-white md:text-7xl">
 				{$uiConfig?.brand_name ?? 'Papad.alt'}
 			</h1>
 			<p class="mt-1 max-w-md text-sm text-gray-100 md:text-lg">
@@ -24,7 +24,7 @@
 			</p>
 			<a
 				href="/groups"
-				class="mt-5 block w-full rounded bg-blue-100 px-4 py-2 text-center text-black hover:bg-blue-800 hover:text-white"
+				class="mt-5 block w-full rounded bg-white px-4 py-2 text-center text-brand-primary hover:bg-brand-primary hover:text-white"
 			>
 				View Collections
 			</a>

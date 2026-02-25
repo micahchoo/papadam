@@ -14,6 +14,9 @@
 <nav class="sticky top-0 z-50 flex w-full justify-between bg-brand-primary p-5">
 	<div class="flex items-center justify-center">
 		<a href="/" class="flex items-center text-2xl font-semibold text-white">
+			{#if $uiConfig?.brand_logo_url}
+				<img src={$uiConfig.brand_logo_url} alt="" class="mr-2 h-8" />
+			{/if}
 			<h1>{$uiConfig?.brand_name ?? 'Papad.alt'}</h1>
 		</a>
 	</div>

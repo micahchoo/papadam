@@ -26,7 +26,7 @@ User = get_user_model()
 class Command(BaseCommand):
     help = "Seed production data (admin user, Instance group, UIConfig)"
 
-    def handle(self, *args, **options):
+    def handle(self, *args: object, **options: object) -> None:
         admin_username = os.environ.get("ADMIN_USERNAME", "admin")
         admin_password = os.environ.get("ADMIN_PASSWORD", "")
 

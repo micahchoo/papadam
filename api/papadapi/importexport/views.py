@@ -1,6 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from rest_framework.request import Request
+
+    from papadapi.users.models import User
 
 from papadapi.common.serializers import CustomPageNumberPagination
 from papadapi.importexport.models import IERequest
@@ -17,9 +26,9 @@ class ExportGroupCreateListSet(
     serializer_class = ExportGroupDataSerializer
     pagination_class = CustomPageNumberPagination
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request: Request, *args: object, **kwargs: object) -> Response:
         data = request.data
-        requested_by = self.request.user
+        requested_by: User = self.request.user  # type: ignore[assignment]
         request_type = "export"
         ie_metadata = data
         ie = IERequest.objects.create(
@@ -37,14 +46,14 @@ class ImportGroupCreateSet(viewsets.GenericViewSet, mixins.CreateModelMixin):
     serializer_class = ExportGroupDataSerializer
     pagination_class = CustomPageNumberPagination
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request: Request, *args: object, **kwargs: object) -> Response:
         data = request.data
         files = request.FILES.get("upload", None)
         if not files:
             return Response(
                 {"detail": "Media missing"}, status=status.HTTP_400_BAD_REQUEST
             )
-        requested_by = self.request.user
+        requested_by: User = self.request.user  # type: ignore[assignment]
         request_type = "import"
         ie_metadata = data["ie_metadata"]
         ie = IERequest.objects.create(
@@ -66,7 +75,7 @@ class ImportExportGroupViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixi
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
-    def retrieve(self, request, *args, **kwargs):
+    def retrieve(self, request: Request, *args: object, **kwargs: object) -> Response:
         request_id = self.kwargs["uuid"]
         queryset = IERequest.objects.filter(request_id=request_id)
         serializer = ExportGroupDataSerializer(queryset, many=True)
@@ -78,6 +87,6 @@ class UserImportExportViewer(viewsets.GenericViewSet, mixins.ListModelMixin):
     serializer_class = ExportGroupDataSerializer
     pagination_class = CustomPageNumberPagination
 
-    def get_queryset(self):
-        user = self.request.user
+    def get_queryset(self) -> QuerySet[IERequest]:
+        user: User = self.request.user  # type: ignore[assignment]
         return IERequest.objects.filter(requested_by=user)

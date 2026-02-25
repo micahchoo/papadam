@@ -1,4 +1,5 @@
 import base64
+import binascii
 
 from rest_framework import serializers
 
@@ -18,7 +19,7 @@ class Base64BinaryField(serializers.Field[str, bytes]):  # type: ignore[type-arg
             raise serializers.ValidationError("Expected a base64-encoded string.")
         try:
             return base64.b64decode(data)
-        except Exception as exc:
+        except (binascii.Error, ValueError) as exc:
             raise serializers.ValidationError("Invalid base64 encoding.") from exc
 
 

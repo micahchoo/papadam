@@ -7,16 +7,22 @@
 
 import { test, expect } from '@playwright/test';
 
+// Default brand values from `$uiConfig?.brand_name ?? 'Papad.alt'` in layout/components.
+// Single change-point if the fallback changes.
+const BRAND_NAME = 'Papad.alt';
+const CONTACT_DOMAIN = 'aruvu.org';
+
 test.describe('home page', () => {
 	test('renders with title and navigation', async ({ page }) => {
 		await page.goto('/');
 
 		// Nav present
 		await expect(page.locator('nav')).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Papad.alt' }).first()).toBeVisible();
+		await expect(page.getByRole('link', { name: BRAND_NAME }).first()).toBeVisible();
 
 		// Hero content
-		await expect(page.getByRole('heading', { name: /Papad\.alt/i }).first()).toBeVisible();
+		const brandPattern = new RegExp(BRAND_NAME.replace('.', '\\.'), 'i');
+		await expect(page.getByRole('heading', { name: brandPattern }).first()).toBeVisible();
 
 		// CTA button
 		await expect(page.getByRole('button', { name: /View Collections/i })).toBeVisible();
@@ -34,11 +40,12 @@ test.describe('home page', () => {
 	test('footer is present with contact info', async ({ page }) => {
 		await page.goto('/');
 
+		const contactPattern = new RegExp(CONTACT_DOMAIN.replace('.', '\\.'), 'i');
 		await expect(page.locator('footer')).toBeVisible();
 		await expect(
 			page
 				.locator('footer')
-				.getByRole('link', { name: /aruvu\.org/i })
+				.getByRole('link', { name: contactPattern })
 				.first()
 		).toBeVisible();
 	});
@@ -80,6 +87,21 @@ test.describe('exhibits page', () => {
 		await page.goto('/exhibits');
 
 		// Layout renders
+		await expect(page.locator('nav')).toBeVisible();
+
+		// No uncaught JS errors
+		expect(errors).toHaveLength(0);
+	});
+});
+
+test.describe('adversarial routes', () => {
+	test('nonexistent route shows error page without crash', async ({ page }) => {
+		const errors: string[] = [];
+		page.on('pageerror', (err) => errors.push(err.message));
+
+		await page.goto('/nonexistent-route-12345');
+
+		// App should still render layout (nav present)
 		await expect(page.locator('nav')).toBeVisible();
 
 		// No uncaught JS errors

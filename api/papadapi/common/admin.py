@@ -1,14 +1,21 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from django.contrib import admin
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
 
 from papadapi.common.models import Group, Tags
 
 
 class BaseAdmin(admin.ModelAdmin):
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         # Disable delete
         return False
 
-    def has_change_permission(self, request, obj=None):
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         # Disable delete
         return False
 
@@ -16,9 +23,10 @@ class BaseAdmin(admin.ModelAdmin):
         description="UUID",
         ordering="uuid",
     )
-    def get_uuid_formatted(self, obj):
+    def get_uuid_formatted(self, obj: Any) -> str | None:
         if obj:
             return str(obj.uuid)
+        return None
 
 
 
@@ -31,5 +39,3 @@ class GroupAdmin(BaseAdmin):
 @admin.register(Tags)
 class TagAdmin(BaseAdmin):
     list_display = ("name", "count", "created_at", "updated_at")
-
-

@@ -1,7 +1,14 @@
+from __future__ import annotations
+
 import re
 import uuid as _uuid_mod
+from typing import TYPE_CHECKING, Any
 
 from rest_framework.permissions import SAFE_METHODS, BasePermission
+
+if TYPE_CHECKING:
+    from rest_framework.request import Request
+    from rest_framework.views import APIView
 
 from papadapi.archive.models import MediaStore
 
@@ -29,7 +36,7 @@ def _to_uuid(value: str) -> _uuid_mod.UUID | None:
 class IsAnnotateCreateOrReadOnly(BasePermission):
     message = "You are not a member of the group to perform this action"
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         # Always allow GET, HEAD or OPTIONS requests.
         # User must be a part of the group.
 
@@ -60,7 +67,7 @@ class IsAnnotateCreateOrReadOnly(BasePermission):
         if group and user:
             if request.method in SAFE_METHODS and group.is_public:
                 return True
-            if user in group.users.all():
+            if user in group.users.all():  # type: ignore[operator]  # TYPE_DEBT: view ensures authenticated user
                 return True
             self.message = _MEMBERSHIP_MSG
             return False
@@ -70,7 +77,9 @@ class IsAnnotateCreateOrReadOnly(BasePermission):
 class IsAnnotateUpdateOrReadOnly(BasePermission):
     message = "You are not a member of the group to perform this action"
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(
+        self, request: Request, view: APIView, obj: Any,
+    ) -> bool:
         # User must be a part of the group.
         media_uuid = _to_uuid(obj.media_reference_id)
         if media_uuid is None:
@@ -86,7 +95,7 @@ class IsAnnotateUpdateOrReadOnly(BasePermission):
         if group and user:
             if request.method in SAFE_METHODS and group.is_public:
                 return True
-            if user in group.users.all():
+            if user in group.users.all():  # type: ignore[operator]  # TYPE_DEBT: view ensures authenticated user
                 return True
             self.message = _MEMBERSHIP_MSG
             return False

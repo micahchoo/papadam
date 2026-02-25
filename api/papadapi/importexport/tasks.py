@@ -30,7 +30,7 @@ log = structlog.get_logger(__name__)
 # ── sync helpers (unchanged from legacy — violations are pre-existing debt) ───
 
 
-def download(url, file_name, files_path):
+def download(url: str, file_name: str, files_path: str) -> str:
     file_name = file_name.split("/")[1]
     with open(os.path.join(files_path, file_name), "wb") as file:
         response = requests.get(url)  # noqa: S113
@@ -38,8 +38,10 @@ def download(url, file_name, files_path):
     return file_name
 
 
-def export_annotation(files_path, annotation):
-    annotation_data = {}
+def export_annotation(
+    files_path: str, annotation: Annotation,
+) -> tuple[str | None, dict[str, Any]]:
+    annotation_data: dict[str, Any] = {}
     annotation_data[str(annotation.uuid)] = {
         "annotation_text": annotation.annotation_text,
         "media_target": annotation.media_target,
@@ -60,9 +62,11 @@ def export_annotation(files_path, annotation):
         return None, annotation_data
 
 
-def export_media(files_path, media_instance):
-    media_file_list = []
-    media_data = {}
+def export_media(
+    files_path: str, media_instance: MediaStore,
+) -> tuple[list[str | None], dict[str, Any]]:
+    media_file_list: list[str | None] = []
+    media_data: dict[str, Any] = {}
     media_data["name"] = media_instance.name
     media_data["description"] = media_instance.description
     media_file = download(
@@ -87,7 +91,9 @@ def export_media(files_path, media_instance):
     return media_file_list, media_data
 
 
-def import_annotation(files_path, annovals, media):
+def import_annotation(
+    files_path: str, annovals: dict[str, Any], media: MediaStore,
+) -> bool:
     annotation_file_name = os.path.join(files_path, annovals["annotation_image"])
     with open(annotation_file_name, "rb") as f:
         Annotation.objects.create(
@@ -99,7 +105,7 @@ def import_annotation(files_path, annovals, media):
     return True
 
 
-def import_media(files_path, media_data, group):
+def import_media(files_path: str, media_data: dict[str, Any], group: Group) -> bool:
     media_file_name = os.path.join(files_path, media_data["media_file_name"])
     with open(media_file_name, "rb") as f:
         media = MediaStore.objects.create(
@@ -120,16 +126,18 @@ def import_media(files_path, media_data, group):
     return True
 
 
-def extract_json_for_import(files_path, import_data):
-    jsondata = {}
-    tarfilename = download(import_data.url, import_data.name, files_path)
+def extract_json_for_import(
+    files_path: str, import_data: object,
+) -> dict[str, Any] | None:
+    jsondata: dict[str, Any] = {}
+    tarfilename = download(import_data.url, import_data.name, files_path)  # type: ignore[attr-defined]
     if tarfile.is_tarfile(tarfilename):
         with tarfile.open(tarfilename, "r") as file_obj:
             file_obj.extractall()  # noqa: S202
         with open("data.json") as f:
             jsondata = json.load(f)
-        return jsondata or False
-    return False
+        return jsondata or None
+    return None
 
 
 # ── sync task bodies ──────────────────────────────────────────────────────────
@@ -223,11 +231,11 @@ def _export_sync(request_id: int) -> bool:
             if requested_by in group.users.all() or group.is_public or media.is_public:
                 media_data = {}
                 media_data["annotation"] = {}
-                media_files, media_data["annotation"] = export_annotation(
+                media_files, media_data["annotation"] = export_annotation(  # type: ignore[assignment]
                     files_path, annotation
                 )
                 if media_files:
-                    media_file_list.append(media_files)
+                    media_file_list.append(media_files)  # type: ignore[arg-type]
                 proceed_upload = True
             else:
                 export.is_complete = True

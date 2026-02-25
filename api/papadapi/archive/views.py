@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import json
 import uuid
 from datetime import timedelta
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from django.conf import settings
@@ -11,6 +14,10 @@ from rest_framework import generics, mixins, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from rest_framework.request import Request
 
 from papadapi.archive.permissions import (
     IsArchiveCopyAllowed,
@@ -45,12 +52,12 @@ class MediaStoreRemoveTag(
     lookup_url_kwarg = "uuid"
     pagination_class = CustomPageNumberPagination
 
-    def get_object(self):
+    def get_object(self) -> MediaStore:
         obj = super().get_object()
         # perform some extra checks on obj, e.g custom permissions
-        return obj
+        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
 
         obj = self.get_object()
@@ -81,12 +88,12 @@ class MediaStoreAddTag(
     lookup_url_kwarg = "uuid"
     pagination_class = CustomPageNumberPagination
 
-    def get_object(self):
+    def get_object(self) -> MediaStore:
         obj = super().get_object()
         # perform some extra checks on obj, e.g custom permissions
-        return obj
+        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
 
         obj = self.get_object()
@@ -95,7 +102,9 @@ class MediaStoreAddTag(
         tags = data.get("tags")
         if tags:
             for tag in tags:
-                m.tags.add(create_or_update_tag(tag))
+                tag_obj = create_or_update_tag(tag)
+                if tag_obj:
+                    m.tags.add(tag_obj)
         serializer = MediaStoreSerializer(m)
         return Response(serializer.data)
 
@@ -115,12 +124,12 @@ class MediaStoreUpdateSet(
     lookup_url_kwarg = "uuid"
     pagination_class = CustomPageNumberPagination
 
-    def get_object(self):
+    def get_object(self) -> MediaStore:
         obj = super().get_object()
         # perform some extra checks on obj, e.g custom permissions
-        return obj
+        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
 
         obj = self.get_object()
@@ -136,12 +145,12 @@ class MediaStoreUpdateSet(
         serializer = MediaStoreSerializer(m)
         return Response(serializer.data)
 
-    def destroy(self, request, *args, **kwargs):
+    def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def perform_destroy(self, instance):
+    def perform_destroy(self, instance: MediaStore) -> None:
         obj = self.get_object()
         m = MediaStore.objects.get(id=obj.id)
         m.is_delete = True
@@ -171,17 +180,18 @@ class MediaStoreUploadFileView(
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         my_file=request.FILES.get('upload')
 
         obj = self.get_object()
         media = MediaStore.objects.get(uuid=obj.uuid)
 
         media.upload=my_file
-        media.orig_name=my_file.name,
-        media.file_extension=my_file.content_type,
+        media.orig_name=my_file.name
+        media.file_extension=my_file.content_type
         media.orig_size=my_file.size
         media.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class MediaStoreCreateSet(
     mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
@@ -196,7 +206,7 @@ class MediaStoreCreateSet(
     serializer_class = MediaStoreSerializer
     pagination_class = CustomPageNumberPagination
 
-    def get_queryset(self, *args, **kwargs):
+    def get_queryset(self) -> QuerySet[MediaStore] | None:  # type: ignore[override]  # TYPE_DEBT: returns None for empty search
         query = None
         search_query = self.request.GET.get("search")
         search_where = self.request.GET.get("searchWhere",None)
@@ -254,7 +264,10 @@ class MediaStoreCreateSet(
             else:
                 pass
 
-        final_query = query & group_query if query else group_query
+        if query and group_query:
+            final_query = query & group_query
+        else:
+            final_query = query or group_query
 
         # mediaType filter: narrows by MIME prefix (audio/video/image).
         # Unknown values silently ignored — no 400, preserves existing client behaviour.
@@ -273,7 +286,7 @@ class MediaStoreCreateSet(
         else:
             return None
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         if "upload" not in request.FILES:
             return Response(
@@ -293,7 +306,7 @@ class MediaStoreCreateSet(
                 if "extra_group_response" in data
                 else []
             )
-            group_extra_response = []
+            group_extra_response: list[dict[str, Any]] = []
             if extra_group_response and len(extra_group_response["answers"]) > 0:
                 for answer in extra_group_response["answers"]:
                     q = answer["question_id"]
@@ -316,7 +329,7 @@ class MediaStoreCreateSet(
                     description=description,
                     group=group_instance,
                     extra_group_response=group_extra_response,
-                    created_by=request.user,
+                    created_by=request.user,  # type: ignore[misc]  # TYPE_DEBT: view requires auth; user is always User
                 )
                 m.upload = files
                 m.orig_name = m.upload.name
@@ -325,7 +338,9 @@ class MediaStoreCreateSet(
                 m.save()
 
                 for tag in data["tags"].split(","):
-                    m.tags.add(create_or_update_tag(tag))
+                    tag_obj = create_or_update_tag(tag)
+                    if tag_obj:
+                        m.tags.add(tag_obj)
 
                 job_id: str | None = None
                 media_type = m.file_extension.split("/")[0]
@@ -344,7 +359,7 @@ class MediaStoreCreateSet(
                 serializer = MediaStoreSerializer(m)
                 return Response({**serializer.data, "job_id": job_id})
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — cleanup handler for any file-upload failure; narrowing is impractical
                 # Clean up: delete metadata if the file upload failed
                 if m.pk:  # Check if the instance was saved to the database
                     m.delete()
@@ -371,7 +386,7 @@ class MediaStoreCopySet(
     serializer_class = MediaStoreSerializer
     pagination_class = CustomPageNumberPagination
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
         obj_uuid = self.kwargs["uuid"]
         group_to = Group.objects.get(id=data["to_group"])
@@ -380,7 +395,7 @@ class MediaStoreCopySet(
             if "extra_group_response" in data
             else {}
         )
-        group_extra_response = []
+        group_extra_response: list[dict[str, Any]] = []
         if extra_group_response and len(extra_group_response["answers"]) > 0:
             for answer in extra_group_response["answers"]:
                 q = answer["question_id"]
@@ -406,7 +421,9 @@ class MediaStoreCopySet(
         m.save()
         if "copy_tags" in data and data["copy_tags"] == "True":
             for tag in old_media.tags.all():
-                m.tags.add(create_or_update_tag(tag.name))
+                tag_obj = create_or_update_tag(tag.name)
+                if tag_obj:
+                    m.tags.add(tag_obj)
         if "copy_annotations" in data and data["copy_annotations"] == "True":
             media_copied.send(
                 sender=self.__class__,
@@ -422,10 +439,10 @@ class InstanceMediaStats(viewsets.GenericViewSet, generics.ListAPIView):
     serializer_class = MediaStatsSerializer
     permission_classes = [IsSuperUser]
 
-    def get_paginated_response(self, data):
+    def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         return Response(data)
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[MediaStore]:
         data = (
             MediaStore.objects.values("id")
             .annotate(created_date=TruncDate("created_at"))
@@ -433,7 +450,7 @@ class InstanceMediaStats(viewsets.GenericViewSet, generics.ListAPIView):
             .values("created_date")
             .annotate(**{"total": Count("created_date")})
         )
-        return data
+        return data  # type: ignore[return-value]
 
 class GroupMediaStats(
     viewsets.GenericViewSet, generics.ListAPIView, generics.RetrieveAPIView
@@ -445,7 +462,7 @@ class GroupMediaStats(
     lookup_field = "id"
     lookup_url_kwarg = "id"
 
-    def retrieve(self, request, *args, **kwargs):
+    def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         group_id = self.kwargs.get("id")
         if group_id:
 
@@ -459,6 +476,7 @@ class GroupMediaStats(
             )
             serializer = MediaStatsSerializer(base_data, many=True)
             return Response(serializer.data)
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 class MediaStoreTranscriptView(APIView):
@@ -471,9 +489,9 @@ class MediaStoreTranscriptView(APIView):
     """
 
     permission_classes = [AllowAny]
-    authentication_classes = []  # no JWT — key-based auth only
+    authentication_classes: list[type[Any]] = []  # no JWT — key-based auth only
 
-    def post(self, request, uuid: str) -> Response:
+    def post(self, request: Request, uuid: str) -> Response:
         expected: str = getattr(settings, "INTERNAL_SERVICE_KEY", "")
         key: str = request.headers.get("X-Internal-Key", "")
         if not expected or key != expected:

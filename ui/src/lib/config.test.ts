@@ -80,6 +80,61 @@ describe('loadConfig', () => {
 	});
 });
 
+describe('loadConfig — adversarial', () => {
+	it('handles malformed JSON gracefully (falls back to defaults)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				json: () => Promise.reject(new SyntaxError('Unexpected token'))
+			})
+		);
+		const { loadConfig } = await import('$lib/config');
+		const cfg = await loadConfig();
+		expect(cfg.apiUrl).toBe('');
+		expect(cfg.crdtUrl).toBe('');
+	});
+
+	it('handles partial config (API_URL only, no CRDT_URL)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				json: () => Promise.resolve({ API_URL: 'http://partial.test' })
+			})
+		);
+		const { loadConfig } = await import('$lib/config');
+		const cfg = await loadConfig();
+		expect(cfg.apiUrl).toBe('http://partial.test');
+		expect(cfg.crdtUrl).toBe('');
+	});
+
+	it('handles empty object {} — both fields fall back to empty string', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				json: () => Promise.resolve({})
+			})
+		);
+		const { loadConfig } = await import('$lib/config');
+		const cfg = await loadConfig();
+		expect(cfg.apiUrl).toBe('');
+		expect(cfg.crdtUrl).toBe('');
+	});
+
+	it('concurrent loadConfig calls both resolve to same values', async () => {
+		const mockFetch = vi.fn().mockResolvedValue({
+			json: () => Promise.resolve({ API_URL: 'http://concurrent.test', CRDT_URL: '' })
+		});
+		vi.stubGlobal('fetch', mockFetch);
+		const { loadConfig } = await import('$lib/config');
+		// loadConfig caches via _loaded flag set after await, so concurrent
+		// calls before the first resolves will both fetch — but both converge
+		// to the same config values.
+		const [cfg1, cfg2] = await Promise.all([loadConfig(), loadConfig()]);
+		expect(cfg1.apiUrl).toBe(cfg2.apiUrl);
+		expect(cfg1.apiUrl).toBe('http://concurrent.test');
+	});
+});
+
 describe('getConfig', () => {
 	it('returns current runtime config after loadConfig resolves', async () => {
 		vi.stubGlobal(

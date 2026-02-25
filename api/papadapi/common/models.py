@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 
 from django.db import models
 from django.urls import reverse
@@ -16,10 +19,10 @@ class Tags(models.Model):
         verbose_name = _("Tags")
         verbose_name_plural = _("Tags")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("Tags_detail", kwargs={"pk": self.pk})
 
 
@@ -51,10 +54,10 @@ class Question(models.Model):
         verbose_name = _("Question")
         verbose_name_plural = _("Questions")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.question
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("Question_detail", kwargs={"pk": self.pk})
 
 
@@ -73,14 +76,14 @@ class Group(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True, editable=False)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
 # ── UIConfig defaults ─────────────────────────────────────────────────────────
 
 
-def _default_player_controls():
+def _default_player_controls() -> dict[str, Any]:
     return {
         "skip_seconds": [10, 30],
         "show_waveform": False,
@@ -89,7 +92,7 @@ def _default_player_controls():
     }
 
 
-def _default_annotations_config():
+def _default_annotations_config() -> dict[str, Any]:
     return {
         "allow_images": True,
         "allow_audio": True,
@@ -99,7 +102,7 @@ def _default_annotations_config():
     }
 
 
-def _default_exhibit_config():
+def _default_exhibit_config() -> dict[str, bool]:
     return {"enabled": True}
 
 
@@ -153,7 +156,7 @@ class UIConfig(models.Model):
     class Meta:
         verbose_name = "UI Configuration"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"UIConfig({self.group})"
 
 
@@ -164,6 +167,8 @@ from django.dispatch import receiver  # noqa: E402
 
 
 @receiver(post_save, sender=Group)
-def create_group_uiconfig(sender, instance, created, **kwargs):
+def create_group_uiconfig(
+    sender: type[Group], instance: Group, created: bool, **kwargs: Any,
+) -> None:
     if created:
         UIConfig.objects.get_or_create(group=instance)

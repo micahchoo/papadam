@@ -59,7 +59,7 @@ class JobStatusView(APIView):
         redis_url: str = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
         try:
             job_status = async_to_sync(_fetch_job_status)(redis_url, job_id)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — external Redis call; any failure → graceful 404
             log.error("job_status_fetch_failed", job_id=job_id, error=str(exc))
             return Response(
                 {"job_id": job_id, "status": "not_found"},

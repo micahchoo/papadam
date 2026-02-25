@@ -39,6 +39,34 @@
 	async function submitAnnotation() {
 		submitting = true;
 		submitError = null;
+
+		// Validate file required for non-text types
+		if (annotationType === 'image' && !imageFile) {
+			submitError = 'An image file is required for image annotations.';
+			submitting = false;
+			return;
+		}
+		if (annotationType === 'audio' && !audioFile) {
+			submitError = 'An audio file is required for audio annotations.';
+			submitting = false;
+			return;
+		}
+		if (annotationType === 'video' && !videoFile) {
+			submitError = 'A video file is required for video annotations.';
+			submitting = false;
+			return;
+		}
+		if (annotationType === 'media_ref' && !mediaRefUuid.trim()) {
+			submitError = 'A media UUID is required for media reference annotations.';
+			submitting = false;
+			return;
+		}
+		if (newAnnotation.start === 0 && newAnnotation.end === 0) {
+			submitError = 'Set a time range for the annotation.';
+			submitting = false;
+			return;
+		}
+
 		try {
 			const formData = new FormData();
 			formData.append('media_reference_id', recording.uuid);
@@ -310,7 +338,7 @@
 				onclick={() => (showAnnotationModal = false)}>Cancel</button
 			>
 			<button
-				class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+				class="rounded bg-brand-primary px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
 				disabled={submitting}
 				onclick={() => void submitAnnotation()}>{submitting ? 'Saving…' : 'Create Annotation'}</button
 			>

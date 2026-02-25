@@ -4,7 +4,7 @@
 	import { page } from '$app/stores';
 	import { groups, archive } from '$lib/api';
 	import type { MediaStore } from '$lib/api';
-	import { selectedGroup, groupMediaList } from '$lib/stores';
+	import { selectedGroup, groupMediaList, dateLocale, isAuthenticated } from '$lib/stores';
 	import UploadMediaModal from '$lib/components/UploadMediaModal.svelte';
 	import SearchSort from '$lib/components/SearchSort.svelte';
 
@@ -43,14 +43,16 @@
 			<div>
 				<h1 class="text-xl font-bold">{$selectedGroup.name}</h1>
 				<p class="mt-2 text-gray-600">{@html DOMPurify.sanitize($selectedGroup.description)}</p>
-				<div class="mt-6">
-					<button
-						class="w-full rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-						onclick={() => (showUploadModal = true)}
-					>
-						Upload Media
-					</button>
-				</div>
+				{#if $isAuthenticated}
+					<div class="mt-6">
+						<button
+							class="w-full rounded bg-brand-primary px-4 py-2 text-white hover:opacity-90"
+							onclick={() => (showUploadModal = true)}
+						>
+							Upload Media
+						</button>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -69,7 +71,7 @@
 						<div class="flex flex-col px-4 pt-4 md:flex-row md:justify-between">
 							<h2 class="mb-2 text-xl font-semibold">{recording.name}</h2>
 							<p class="text-sm text-gray-500">
-								{new Date(recording.created_at).toLocaleDateString('en-GB')}
+								{new Date(recording.created_at).toLocaleDateString($dateLocale)}
 							</p>
 						</div>
 						<p class="my-5 mt-2 h-12 overflow-hidden px-4 text-gray-600">{recording.description}</p>
@@ -77,7 +79,7 @@
 							{#each recording.tags.slice(0, 3) as tag}
 								{#if tag.name && tag.count > 0 && tag.name.length <= 30}
 									<span
-										class="mr-1 inline-flex bg-blue-200 px-2 py-1 text-xs font-semibold uppercase text-blue-500"
+										class="mr-1 inline-flex bg-gray-200 px-2 py-1 text-xs font-semibold uppercase text-gray-600"
 									>
 										{tag.name}
 									</span>
@@ -86,7 +88,7 @@
 						</div>
 						<a
 							href="{groupId}/media/{recording.uuid}"
-							class="mt-5 block w-full bg-blue-950 px-4 py-4 text-center text-white hover:bg-blue-600 md:absolute md:bottom-0 md:right-0 md:w-fit"
+							class="mt-5 block w-full bg-brand-primary px-4 py-4 text-center text-white hover:opacity-90 md:absolute md:bottom-0 md:right-0 md:w-fit"
 						>
 							View Media
 						</a>

@@ -179,7 +179,7 @@
 					onclick={closeUploadModal}>Cancel</button
 				>
 				<button
-					class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+					class="rounded bg-brand-primary px-4 py-2 text-white hover:opacity-90"
 					onclick={() => void submitMedia()}>Submit</button
 				>
 			</div>
@@ -189,7 +189,7 @@
 
 <style>
 	.loader {
-		border-top-color: #3498db;
+		border-top-color: var(--brand-accent);
 		animation: spin 0.6s linear infinite;
 	}
 	@keyframes spin {

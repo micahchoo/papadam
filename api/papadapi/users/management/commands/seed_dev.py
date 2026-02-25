@@ -34,7 +34,7 @@ _SEED_TAGS = [
 class Command(BaseCommand):
     help = "Seed development data (admin/admin, demo/demo, Demo Community group, tags)"
 
-    def handle(self, *args, **options):
+    def handle(self, *args: object, **options: object) -> None:
         # ── admin superuser ───────────────────────────────────────────────────
         admin, created = User.objects.get_or_create(
             username="admin",
@@ -87,7 +87,7 @@ class Command(BaseCommand):
         group.users.add(demo)
 
         # ── UIConfig ──────────────────────────────────────────────────────────
-        config, created = UIConfig.objects.get_or_create(group=group)
+        _config, created = UIConfig.objects.get_or_create(group=group)
         if created:
             logger.info("created_uiconfig", group="Demo Community")
             self.stdout.write("  created UIConfig for Demo Community")

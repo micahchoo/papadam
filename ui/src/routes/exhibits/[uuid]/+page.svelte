@@ -41,13 +41,17 @@
 
 			const results = await Promise.all(
 				ex.blocks.map(async (block): Promise<BlockResult> => {
-					if (block.block_type === 'media' && block.media_uuid) {
-						const { data } = await archive.get(block.media_uuid);
-						return { kind: 'media', blockId: block.id, data };
-					}
-					if (block.block_type === 'annotation' && block.annotation_uuid) {
-						const { data } = await annoApi.get(block.annotation_uuid);
-						return { kind: 'annotation', blockId: block.id, data };
+					try {
+						if (block.block_type === 'media' && block.media_uuid) {
+							const { data } = await archive.get(block.media_uuid);
+							return { kind: 'media', blockId: block.id, data };
+						}
+						if (block.block_type === 'annotation' && block.annotation_uuid) {
+							const { data } = await annoApi.get(block.annotation_uuid);
+							return { kind: 'annotation', blockId: block.id, data };
+						}
+					} catch {
+						// Block's referenced item was deleted or inaccessible — render as missing
 					}
 					return null;
 				})
