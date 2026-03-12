@@ -40,7 +40,7 @@ class AnnotationCreateSet(
     serializer_class = AnnotationSerializer
     permission_classes = [IsAnnotateCreateOrReadOnly]
 
-    def get_queryset(self) -> QuerySet[Annotation] | None:  # type: ignore[override]  # TYPE_DEBT: returns None for empty search
+    def get_queryset(self) -> QuerySet[Annotation]:  # type: ignore[override]
         query = None
         search_query = self.request.GET.get("search")
         search_where = self.request.GET.get("searchWhere", None)
@@ -80,18 +80,28 @@ class AnnotationCreateSet(
                 group_list = search_collections.split(",")
                 group_query = Q(mediagroup__in=Group.objects.filter(id__in=group_list))
             else:
-                # No recognised search_from -- return empty queryset rather than
-                # a Response object (which would crash the paginator).
-                return Annotation.objects.none()
+                # Support ?group=<id> shorthand from frontend
+                group_param = self.request.GET.get("group")
+                if group_param:
+                    group_query = Q(
+                        group_id=group_param,
+                        group__in=Group.objects.filter(users__in=[self.request.user])
+                        | Group.objects.filter(is_public=True, is_active=True),
+                    )
+                else:
+                    # Bare list: show all annotations from user's groups + public
+                    group_query = Q(
+                        group__in=Group.objects.filter(is_public=True, is_active=True)
+                    ) | Q(group__in=Group.objects.filter(users__in=[self.request.user]))
 
         final_query = query & group_query if query else group_query
         if final_query:
             return (
-                Annotation.objects.filter(query & Q(is_delete=False))  # type: ignore[operator]  # TYPE_DEBT: query is Q when final_query is truthy via query path
+                Annotation.objects.filter(final_query & Q(is_delete=False))
                 .distinct()
                 .order_by("created_at")
             )
-        return None
+        return Annotation.objects.none()
 
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         serializer = AnnotationSerializer(
