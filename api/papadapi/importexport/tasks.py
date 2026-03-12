@@ -94,14 +94,35 @@ def export_media(
 def import_annotation(
     files_path: str, annovals: dict[str, Any], media: MediaStore,
 ) -> bool:
-    annotation_file_name = os.path.join(files_path, annovals["annotation_image"])
-    with open(annotation_file_name, "rb") as f:
-        Annotation.objects.create(
-            annotation_text=annovals["annotation_text"],
-            media_target=annovals["media_target"],
-            media_reference_id=str(media.uuid),
-            annotation_image=File(file=f),
-        )
+    from papadapi.annotate.serializers import AnnotationSerializer
+
+    data: dict[str, Any] = {
+        "annotation_text": annovals.get("annotation_text", ""),
+        "media_target": annovals.get("media_target", ""),
+        "media_reference_id": str(media.uuid),
+        "annotation_type": annovals.get("annotation_type", "text"),
+    }
+    reply_to = annovals.get("reply_to")
+    if reply_to is not None:
+        data["reply_to"] = reply_to
+
+    serializer = AnnotationSerializer(data=data)
+    if not serializer.is_valid():
+        log.warning("import_annotation_validation_failed", errors=serializer.errors)
+        return False
+
+    image_name = annovals.get("annotation_image")
+    if image_name:
+        annotation_file_name = os.path.join(files_path, image_name)
+        try:
+            with open(annotation_file_name, "rb") as f:
+                instance = serializer.save(group=media.group)
+                instance.annotation_image.save(image_name, File(file=f), save=True)
+        except FileNotFoundError:
+            log.warning("import_annotation_image_missing", path=annotation_file_name)
+            return False
+    else:
+        serializer.save(group=media.group)
     return True
 
 
