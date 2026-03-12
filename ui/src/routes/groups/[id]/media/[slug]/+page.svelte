@@ -302,15 +302,15 @@
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 					{#each mediaRefs as ref}
 						<a
-							href="/groups/{recording.group.id}/media/{ref.media_reference_id}"
-							class="block border-l-2 border-gray-300 py-2 pl-4 hover:border-gray-900"
+							href="/groups/{ref.group ?? recording.group.id}/media/{ref.media_reference_id}"
+							class="block border-l-2 border-gray-200 py-2 pl-3 hover:bg-gray-50"
 						>
-							<p class="font-body text-sm font-medium text-gray-900">
-								{ref.media_reference_id}
+							<p class="font-body text-sm text-gray-700 line-clamp-2">
+								{ref.annotation_text || 'Media reference'}
 							</p>
-							<p class="mt-1 line-clamp-2 font-body text-xs text-gray-500">
-								{ref.annotation_text || 'No description'}
-							</p>
+							<span class="font-body text-xs text-gray-400">
+								{ref.annotation_type} · {new Date(ref.created_at).toLocaleDateString()}
+							</span>
 						</a>
 					{/each}
 				</div>
