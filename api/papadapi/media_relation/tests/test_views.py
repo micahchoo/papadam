@@ -99,6 +99,37 @@ def test_create_reply_sets_created_by(auth_client, user, annotation):
     assert reply.created_by == user
 
 
+@pytest.mark.django_db
+def test_reply_at_max_depth_returns_400(member_client, member_annotation, member_media):
+    """Creating a reply at depth > MAX_REPLY_DEPTH must return 400."""
+    # member_annotation is depth 0 (root)
+    # Create depth 1 reply
+    resp1 = member_client.post(
+        f"/api/v1/media-relation/replies/{member_annotation.uuid}/",
+        {"annotation_text": "depth-1 reply"},
+        format="json",
+    )
+    assert resp1.status_code == 201
+    depth1_uuid = resp1.data["uuid"]
+
+    # Create depth 2 reply (reply to the reply)
+    resp2 = member_client.post(
+        f"/api/v1/media-relation/replies/{depth1_uuid}/",
+        {"annotation_text": "depth-2 reply"},
+        format="json",
+    )
+    assert resp2.status_code == 201
+    depth2_uuid = resp2.data["uuid"]
+
+    # Depth 3 should be rejected
+    resp3 = member_client.post(
+        f"/api/v1/media-relation/replies/{depth2_uuid}/",
+        {"annotation_text": "depth-3 reply — too deep"},
+        format="json",
+    )
+    assert resp3.status_code == 400
+
+
 # ── Media refs ────────────────────────────────────────────────────────────────
 
 

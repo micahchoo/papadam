@@ -60,6 +60,7 @@ class AnnotationRepliesView(APIView):
                 {"detail": "Annotation not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
+        # Build data dict with parent context defaults
         data = {
             "media_reference_id": request.data.get(
                 "media_reference_id", parent.media_reference_id
@@ -67,18 +68,22 @@ class AnnotationRepliesView(APIView):
             "annotation_text": request.data.get("annotation_text", ""),
             "media_target": request.data.get("media_target", ""),
             "annotation_type": request.data.get("annotation_type", "text"),
+            "reply_to": parent.pk,
         }
-        reply = Annotation.objects.create(
-            **data,
-            reply_to=parent,
+        serializer = AnnotationSerializer(data=data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        reply = serializer.save(
             group=parent.group,
             created_by=cast("UserModel", request.user),
         )
+
         if "tags" in request.data:
             from papadapi.common.functions import create_or_update_tag
 
             for tag in request.data["tags"].split(","):
-                reply.tags.add(create_or_update_tag(tag.strip()))
+                tag_name = tag.strip()
+                if tag_name:
+                    reply.tags.add(create_or_update_tag(tag_name))
 
         log.info(
             "reply_annotation_created",

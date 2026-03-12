@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 
@@ -95,67 +94,40 @@ class AnnotationCreateSet(
         return None
 
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        data = request.data
+        serializer = AnnotationSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
 
-        # Mandatory fields
-        media_reference_id = data["media_reference_id"]
-        annotation_text = data.get("annotation_text", "")
-        media_target = data["media_target"]
-
-        # Optional typed fields
-        annotation_type = data.get("annotation_type", Annotation.AnnotationType.TEXT)
-        valid_types = {choice[0] for choice in Annotation.AnnotationType.choices}
-        if annotation_type not in valid_types:
-            return Response(
-                {"detail": f"Invalid annotation_type: {annotation_type}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        media_ref_uuid_raw = data.get("media_ref_uuid") or None
-        reply_to_raw = data.get("reply_to") or None
-
-        m = Annotation.objects.create(
-            media_reference_id=media_reference_id,
-            annotation_text=annotation_text,
-            media_target=media_target,
-            annotation_type=annotation_type,
-            media_ref_uuid=media_ref_uuid_raw,
-            # TYPE_DEBT: permission classes guarantee User not AnonymousUser
-            created_by=cast("User", self.request.user),
+        m = serializer.save(
+            created_by=cast("User", request.user),
         )
 
-        # File fields -- assigned after create so upload_to functions run
-        image_file = request.FILES.get("annotation_image")
-        audio_file = request.FILES.get("annotation_audio")
-        video_file = request.FILES.get("annotation_video")
-        if image_file:
-            m.annotation_image = image_file
-        if audio_file:
-            m.annotation_audio = audio_file
-        if video_file:
-            m.annotation_video = video_file
+        # File fields — assigned after create so upload_to functions run
+        changed = False
+        for field_name in ("annotation_image", "annotation_audio", "annotation_video"):
+            f = request.FILES.get(field_name)
+            if f:
+                setattr(m, field_name, f)
+                changed = True
+        if changed:
+            m.save()
 
-        if reply_to_raw is not None:
-            with contextlib.suppress(Annotation.DoesNotExist, ValueError, TypeError):
-                m.reply_to = Annotation.objects.get(id=int(reply_to_raw))
-
-        m.save()
-
-        # Enqueue HLS transcoding for audio/video reply files -- raw files remain
-        # playable natively if the worker hasn't processed them yet.
-        if audio_file:
+        # Enqueue HLS transcoding for audio/video reply files
+        if request.FILES.get("annotation_audio"):
             enqueue("transcode_annotation_audio", m.id)
-        if video_file:
+        if request.FILES.get("annotation_video"):
             enqueue("transcode_annotation_video", m.id)
 
-        for tag in data.get("tags", "").split(","):
+        # Tags — comma-separated string
+        for tag in request.data.get("tags", "").split(","):
             tag = tag.strip()
             if tag:
                 tag_obj = create_or_update_tag(tag)
                 if tag_obj:
                     m.tags.add(tag_obj)
 
-        serializer = AnnotationSerializer(m)
-        return Response(serializer.data)
+        return Response(AnnotationSerializer(m).data)
 
 class AnnotationRetreiveSet(
     mixins.RetrieveModelMixin,
@@ -184,50 +156,36 @@ class AnnotationRetreiveSet(
         return Annotation.objects.filter(is_delete=False)
 
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        data = request.data
+        instance = self.get_object()
+        serializer = AnnotationSerializer(
+            instance, data=request.data, partial=True, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        m = serializer.save()
 
-        obj = self.get_object()
-        m = Annotation.objects.get(id=obj.id)
-
-        if "annotation_text" in data:
-            m.annotation_text = data["annotation_text"]
-        if "annotation_type" in data:
-            valid_types = {choice[0] for choice in Annotation.AnnotationType.choices}
-            if data["annotation_type"] not in valid_types:
-                return Response(
-                    {"detail": f"Invalid annotation_type: {data['annotation_type']}"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            m.annotation_type = data["annotation_type"]
-        if "media_target" in data:
-            m.media_target = data["media_target"]
-        if "media_ref_uuid" in data:
-            m.media_ref_uuid = data["media_ref_uuid"] or None
-
-        if "tags" in data:
+        # Tags — comma-separated string replaces existing set
+        if "tags" in request.data:
             for tag in m.tags.all():
                 m.tags.remove(tag)
                 recalculate_tag_count(tag)
-            for tag_name in data["tags"].split(","):
+            for tag_name in request.data["tags"].split(","):
                 tag_name = tag_name.strip()
                 if tag_name:
                     tag_obj = create_or_update_tag(tag_name)
                     if tag_obj:
                         m.tags.add(tag_obj)
 
-        image_file = request.FILES.get("annotation_image")
-        audio_file = request.FILES.get("annotation_audio")
-        video_file = request.FILES.get("annotation_video")
-        if image_file:
-            m.annotation_image = image_file
-        if audio_file:
-            m.annotation_audio = audio_file
-        if video_file:
-            m.annotation_video = video_file
+        # File fields
+        changed = False
+        for field_name in ("annotation_image", "annotation_audio", "annotation_video"):
+            f = request.FILES.get(field_name)
+            if f:
+                setattr(m, field_name, f)
+                changed = True
+        if changed:
+            m.save()
 
-        m.save()
-        serializer = AnnotationSerializer(m)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(AnnotationSerializer(m).data, status=status.HTTP_200_OK)
 
     def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         instance = self.get_object()
