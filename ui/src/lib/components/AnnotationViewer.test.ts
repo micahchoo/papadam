@@ -25,7 +25,8 @@ vi.mock('$lib/api', () => ({
 	},
 	mediaRelation: {
 		createReply: vi.fn().mockResolvedValue({ data: {} })
-	}
+	},
+	MAX_REPLY_DEPTH: 2
 }));
 
 // ── Mock stores ────────────────────────────────────────────────────────────────
@@ -208,6 +209,32 @@ describe('AnnotationViewer', () => {
 		render(AnnotationViewer, { props: { annotations: annos } });
 		expect(screen.getByText('First')).toBeInTheDocument();
 		expect(screen.getByText('Second')).toBeInTheDocument();
+	});
+
+	// ── Depth-based reply hiding ────────────────────────────────────────
+
+	it('hides Reply button at max nesting depth', () => {
+		// root (depth 0) -> reply (depth 1) -> reply-to-reply (depth 2, no Reply button)
+		const root = makeAnnotation({ id: 1, annotation_text: 'Root' });
+		const child = makeAnnotation({
+			id: 2,
+			uuid: 'child-uuid',
+			annotation_text: 'Child',
+			reply_to: 1
+		});
+		const grandchild = makeAnnotation({
+			id: 3,
+			uuid: 'grandchild-uuid',
+			annotation_text: 'Grandchild',
+			reply_to: 2
+		});
+		render(AnnotationViewer, {
+			props: { annotations: [root, child, grandchild] }
+		});
+		expect(screen.getByText('Grandchild')).toBeInTheDocument();
+		// Root and child have Reply buttons (depth 0 and 1), grandchild (depth 2) does not
+		const replyButtons = screen.getAllByText('Reply');
+		expect(replyButtons).toHaveLength(2);
 	});
 
 	// ── Adversarial ──────────────────────────────────────────────────────────

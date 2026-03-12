@@ -88,6 +88,9 @@ export interface MediaStore {
 
 export type AnnotationType = 'text' | 'image' | 'audio' | 'video' | 'media_ref';
 
+/** Maximum reply nesting depth (0-indexed: root=0, reply=1, reply-to-reply=2). */
+export const MAX_REPLY_DEPTH = 2;
+
 export interface Annotation {
 	id: number;
 	uuid: string;
