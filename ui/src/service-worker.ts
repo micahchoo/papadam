@@ -4,10 +4,11 @@
 /// <reference lib="webworker" />
 
 import { build, files, version } from '$service-worker';
+import { BackgroundSyncPlugin } from 'workbox-background-sync';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { NetworkFirst, NetworkOnly, StaleWhileRevalidate } from 'workbox-strategies';
 
 // Precache all build output (JS, CSS) and static files
 const precacheEntries = [...build, ...files].map((url) => ({
@@ -32,7 +33,19 @@ registerRoute(
 	})
 );
 
-// API responses — network-first with cached fallback for offline
+// POST requests to upload endpoints: network-only with background sync retry
+const uploadSyncPlugin = new BackgroundSyncPlugin('upload-queue', {
+	maxRetentionTime: 7 * 24 * 60 // 7 days in minutes
+});
+
+registerRoute(
+	({ url }) =>
+		url.pathname.startsWith('/api/v1/annotate/') || url.pathname.startsWith('/api/v1/archive/'),
+	new NetworkOnly({ plugins: [uploadSyncPlugin] }),
+	'POST'
+);
+
+// API GET responses — network-first with cached fallback for offline
 registerRoute(
 	({ url }) => url.pathname.startsWith('/api/'),
 	new NetworkFirst({

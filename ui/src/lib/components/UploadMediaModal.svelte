@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { archive } from '$lib/api';
 	import { pollJob } from '$lib/events';
 	import type { JobPoller } from '$lib/events';
 	import { selectedGroupDetails, groupMediaList } from '$lib/stores';
+	import { getQueuedUploads, discardUpload, type QueuedUpload } from '$lib/upload-queue';
 
 	interface Props {
 		showUploadModal: boolean;
@@ -20,6 +21,21 @@
 	let activePoller: JobPoller | null = null;
 
 	const selectedGroupId = $derived($selectedGroupDetails?.id ?? null);
+
+	let queuedUploads = $state<QueuedUpload[]>([]);
+
+	async function refreshQueue() {
+		queuedUploads = await getQueuedUploads();
+	}
+
+	async function handleDiscard(id: number) {
+		await discardUpload(id);
+		await refreshQueue();
+	}
+
+	onMount(() => {
+		void refreshQueue();
+	});
 
 	// Auto-close a beat after processing completes
 	$effect(() => {
@@ -183,6 +199,27 @@
 					onclick={() => void submitMedia()}>Submit</button
 				>
 			</div>
+
+			{#if queuedUploads.length > 0}
+				<div class="mt-6 border-t border-gray-200 pt-4">
+					<h3 class="mb-2 text-sm font-semibold text-gray-500">
+						Pending uploads ({queuedUploads.length})
+					</h3>
+					<ul class="space-y-2">
+						{#each queuedUploads as upload (upload.id)}
+							<li class="flex items-center justify-between rounded bg-amber-50 px-3 py-2 text-sm">
+								<span class="truncate text-gray-700">{upload.url}</span>
+								<button
+									class="ml-2 text-xs text-red-600 hover:underline"
+									onclick={() => void handleDiscard(upload.id)}
+								>
+									Discard
+								</button>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>
