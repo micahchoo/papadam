@@ -151,7 +151,7 @@ All other paths fall through to `papadam-ui:80` (SPA with `try_files` → `index
 ## Create admin user
 
 ```bash
-docker exec -it papadam-api python manage.py createsuperuser
+docker exec -it papadam-api python manage-prod.py createsuperuser
 ```
 
 Admin site: `https://your-domain/nimda/`
