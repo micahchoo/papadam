@@ -29,6 +29,7 @@ export default defineConfig({
 		}
 	},
 	resolve: {
+		conditions: ['browser'],
 		alias: {
 			$lib: '/src/lib',
 			$app: '/.svelte-kit/runtime/app'

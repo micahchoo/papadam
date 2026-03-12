@@ -10,6 +10,11 @@ build/
 .venv/
 venv/
 .env
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+*.sqlite3
 
 # Node
 node_modules/
@@ -17,6 +22,8 @@ node_modules/
 .next/
 dist/
 build/
+.eslintcache
+*.tsbuildinfo
 
 # Secrets & local config
 service_config.env
@@ -29,6 +36,7 @@ db/
 redis-data/
 caddy-data/
 pg-data/
+dump.rdb
 
 # Tasks
 tasks.db
@@ -42,6 +50,16 @@ Thumbs.db
 .vscode/
 .idea/
 *.code-workspace
+
+# Claude Code
+.claude/settings.local.json
+
+# Tags & cscope (auto-generated)
+tags
+cscope.*
+
+# Worktrees
+.worktrees/
 
 # Test artefacts
 .coverage

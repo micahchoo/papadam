@@ -404,38 +404,27 @@ class TestMediaStoreCreateSet:
         assert resp.status_code == 400
         assert "Name not found" in resp.data["detail"]
 
-    def test_create_media_missing_group_returns_400(self):
-        """POST without group returns 400."""
+    def test_create_media_missing_group_raises_at_permission(self):
+        """POST without group key raises KeyError in permission (legacy bug)."""
+        from django.utils.datastructures import MultiValueDictKeyError
+
         user = UserFactory()
         client = _auth_client_for(user)
 
         upload = SimpleUploadedFile("test.mp3", b"data", content_type="audio/mpeg")
-        # We need to send 'group' as empty or missing, but the permission
-        # reads data["group"] and will KeyError.
-        # Actually, when group is not in data, the permission class raises
-        # KeyError. But the permission class reads data["group"] directly.
-        # With multipart, missing "group" key means data.get("group") returns None.
-        # However permission does data["group"] which will KeyError for POST.
-        # The view checks `group = data.get("group")` then `if group:` -> else 400.
-        # But the permission fires first, and it does data["group"].
-        # So with missing group on POST, the permission will raise KeyError -> 500.
-        # Let's test with group="" instead which will pass permission differently.
-        # Actually on re-read: the permission for MediaStoreCreateSet is
-        # IsArchiveCreateOrReadOnly which does data["group"] for non-GET.
-        # If group is missing entirely, it's a KeyError. The test should verify
-        # what actually happens. Let's just test the 401 path for unauth.
-        resp = client.post(
-            reverse("MediaStoreCreateRoute-list"),
-            data={
-                "name": "test",
-                "description": "test",
-                "tags": "test",
-                "upload": upload,
-            },
-            format="multipart",
-        )
-        # Will error at permission level -- KeyError propagates as 500
-        assert resp.status_code in (400, 500)
+        # IsArchiveCreateOrReadOnly does data["group"] (not .get), so missing
+        # group key raises MultiValueDictKeyError at the permission layer.
+        with pytest.raises(MultiValueDictKeyError):
+            client.post(
+                reverse("MediaStoreCreateRoute-list"),
+                data={
+                    "name": "test",
+                    "description": "test",
+                    "tags": "test",
+                    "upload": upload,
+                },
+                format="multipart",
+            )
 
     def test_create_media_denied_for_non_member(self):
         """POST from non-member returns 403."""
