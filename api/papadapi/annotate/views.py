@@ -127,7 +127,7 @@ class AnnotationCreateSet(
                 if tag_obj:
                     m.tags.add(tag_obj)
 
-        return Response(AnnotationSerializer(m).data)
+        return Response(AnnotationSerializer(m).data, status=status.HTTP_201_CREATED)
 
 class AnnotationRetreiveSet(
     mixins.RetrieveModelMixin,

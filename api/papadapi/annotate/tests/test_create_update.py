@@ -27,7 +27,7 @@ def test_create_defaults_to_text_type(member_client, member_media):
         },
         format="multipart",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert resp.data["annotation_type"] == "text"
 
 
@@ -44,7 +44,7 @@ def test_create_stores_annotation_type_audio(member_client, member_media):
         },
         format="multipart",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert resp.data["annotation_type"] == "audio"
     ann = Annotation.objects.get(uuid=resp.data["uuid"])
     assert ann.annotation_type == Annotation.AnnotationType.AUDIO
@@ -63,7 +63,7 @@ def test_create_stores_annotation_type_video(member_client, member_media):
         },
         format="multipart",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert resp.data["annotation_type"] == "video"
 
 
@@ -84,7 +84,7 @@ def test_create_stores_media_ref_uuid(member_client, member_media, group_with_me
         },
         format="multipart",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert resp.data["annotation_type"] == "media_ref"
     ann = Annotation.objects.get(uuid=resp.data["uuid"])
     assert str(ann.media_ref_uuid) == str(ref_media.uuid)
@@ -103,7 +103,7 @@ def test_create_reply_to_sets_parent(member_client, member_media, member_annotat
         },
         format="multipart",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     ann = Annotation.objects.get(uuid=resp.data["uuid"])
     assert ann.reply_to_id == member_annotation.id
 
@@ -242,7 +242,7 @@ def test_create_with_valid_reply_to_and_media_ref(
         },
         format="multipart",
     )
-    assert resp.status_code in (200, 201)
+    assert resp.status_code == 201
     ann = Annotation.objects.get(uuid=resp.data["uuid"])
     assert ann.reply_to_id == member_annotation.id
     assert str(ann.media_ref_uuid) == str(ref_media.uuid)
@@ -335,7 +335,7 @@ def test_create_audio_annotation_enqueues_transcode(member_client, member_media)
             },
             format="multipart",
         )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     created_id = Annotation.objects.get(uuid=resp.data["uuid"]).id
     mock_enqueue.assert_called_once_with("transcode_annotation_audio", created_id)
 
@@ -357,7 +357,7 @@ def test_create_video_annotation_enqueues_transcode(member_client, member_media)
             },
             format="multipart",
         )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     created_id = Annotation.objects.get(uuid=resp.data["uuid"]).id
     mock_enqueue.assert_called_once_with("transcode_annotation_video", created_id)
 
@@ -376,5 +376,5 @@ def test_create_text_annotation_does_not_enqueue(member_client, member_media):
             },
             format="multipart",
         )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     mock_enqueue.assert_not_called()
