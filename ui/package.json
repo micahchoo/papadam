@@ -47,6 +47,11 @@
 		"bits-ui": "^0.21.0",
 		"dompurify": "^3.3.1",
 		"hls.js": "^1.5.13",
+		"workbox-background-sync": "^7.4.0",
+		"workbox-expiration": "^7.4.0",
+		"workbox-precaching": "^7.4.0",
+		"workbox-routing": "^7.4.0",
+		"workbox-strategies": "^7.4.0",
 		"y-indexeddb": "^9.0.12",
 		"y-websocket": "^2.0.3",
 		"yjs": "^13.6.18"
