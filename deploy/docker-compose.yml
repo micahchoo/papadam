@@ -155,6 +155,7 @@ services:
     image: caddy:2-alpine
     profiles: [webserver]
     restart: unless-stopped
+    env_file: service_config.env
     ports:
       - "80:80"
       - "443:443"
