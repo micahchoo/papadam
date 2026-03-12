@@ -71,6 +71,11 @@ vi.mock('$lib/components/primitives/AnnotationMedia.svelte', () => ({
 	default: vi.fn()
 }));
 
+// ── Mock EditAnnotationModal ────────────────────────────────────────────────────
+vi.mock('$lib/components/EditAnnotationModal.svelte', () => ({
+	default: vi.fn()
+}));
+
 import AnnotationViewer from './AnnotationViewer.svelte';
 
 const MOCK_USER: User = { id: 1, username: 'alice', first_name: 'Alice', last_name: 'A' };
@@ -92,6 +97,7 @@ function makeAnnotation(overrides: Partial<Annotation> = {}): Annotation {
 		created_at: '2024-06-15T10:00:00Z',
 		updated_at: '2024-06-15T10:00:00Z',
 		created_by: MOCK_USER,
+		group: 1,
 		...overrides
 	};
 }
