@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import axios from 'axios';
-	import { auth } from '$lib/api';
+	import { auth, syncTokensToIdb } from '$lib/api';
 	import { currentUser } from '$lib/stores';
 
 	let username = $state('');
@@ -20,6 +20,7 @@
 			const { data: tokens } = await auth.login(username, password);
 			localStorage.setItem('access_token', tokens.access);
 			localStorage.setItem('refresh_token', tokens.refresh);
+			void syncTokensToIdb(tokens.access, tokens.refresh);
 			const { data: user } = await auth.me();
 			currentUser.set(user);
 			await goto('/groups');

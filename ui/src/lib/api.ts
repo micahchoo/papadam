@@ -236,6 +236,56 @@ function ensureBaseUrl(): Promise<void> {
 	return _urlReady;
 }
 
+// ── IDB token sync (for service worker Background Sync) ──────────────────────
+// The SW can't read localStorage, so we dual-write tokens to IndexedDB.
+
+const AUTH_DB = 'papadam-auth';
+const AUTH_STORE = 'tokens';
+
+function openAuthDb(): Promise<IDBDatabase> {
+	return new Promise((resolve, reject) => {
+		const req = indexedDB.open(AUTH_DB, 1);
+		req.onupgradeneeded = () => {
+			req.result.createObjectStore(AUTH_STORE);
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+}
+
+export async function syncTokensToIdb(access: string, refresh?: string): Promise<void> {
+	try {
+		const db = await openAuthDb();
+		const tx = db.transaction(AUTH_STORE, 'readwrite');
+		const store = tx.objectStore(AUTH_STORE);
+		store.put(access, 'access_token');
+		if (refresh !== undefined) store.put(refresh, 'refresh_token');
+		await new Promise<void>((resolve, reject) => {
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+		});
+	} catch {
+		// IDB not available (SSR, old browser) — SW auth refresh won't work
+		// but uploads still work when online via the normal 401 interceptor
+	}
+}
+
+export async function clearTokensFromIdb(): Promise<void> {
+	try {
+		const db = await openAuthDb();
+		const tx = db.transaction(AUTH_STORE, 'readwrite');
+		const store = tx.objectStore(AUTH_STORE);
+		store.delete('access_token');
+		store.delete('refresh_token');
+		await new Promise<void>((resolve, reject) => {
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+		});
+	} catch {
+		// safe to ignore
+	}
+}
+
 // Attach access token and resolve base URL on every request
 http.interceptors.request.use(async (config) => {
 	await ensureBaseUrl();
@@ -265,6 +315,7 @@ http.interceptors.response.use(
 						refresh
 					});
 					localStorage.setItem('access_token', data.access);
+					void syncTokensToIdb(data.access);
 					original.headers['Authorization'] = `Bearer ${data.access}`;
 					return await http(original);
 				} catch {
@@ -273,6 +324,7 @@ http.interceptors.response.use(
 			}
 			localStorage.removeItem('access_token');
 			localStorage.removeItem('refresh_token');
+			void clearTokensFromIdb();
 			window.location.href = '/auth/login';
 		}
 		return Promise.reject(rawErr);

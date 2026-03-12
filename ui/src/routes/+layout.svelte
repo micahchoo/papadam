@@ -1,14 +1,15 @@
 <script lang="ts">
 	import '../app.css';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import type { Snippet } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
 	import { createI18n } from '@inlang/paraglide-sveltekit';
 	import * as runtime from '$lib/i18n/runtime';
 	import NavBar from '$lib/components/NavBar.svelte';
 	import { loadConfig, loadUIConfig } from '$lib/config';
 	import { currentUser, uiConfig } from '$lib/stores';
-	import { auth } from '$lib/api';
+	import { auth, clearTokensFromIdb } from '$lib/api';
 
 	const i18n = createI18n(runtime);
 	const { children }: { children: Snippet } = $props();
@@ -44,6 +45,27 @@
 			}
 		}
 		layoutReady = true;
+	});
+
+	// Listen for AUTH_EXPIRED messages from the service worker
+	function handleSwMessage(event: MessageEvent) {
+		if ((event.data as Record<string, unknown>)?.type === 'AUTH_EXPIRED') {
+			localStorage.removeItem('access_token');
+			localStorage.removeItem('refresh_token');
+			void clearTokensFromIdb();
+			currentUser.set(null);
+			void goto('/auth/login');
+		}
+	}
+
+	onMount(() => {
+		navigator.serviceWorker?.addEventListener('message', handleSwMessage);
+	});
+
+	onDestroy(() => {
+		if (typeof navigator !== 'undefined') {
+			navigator.serviceWorker?.removeEventListener('message', handleSwMessage);
+		}
 	});
 </script>
 

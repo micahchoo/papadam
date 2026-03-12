@@ -633,3 +633,122 @@ describe('uiconfig', () => {
 		expect(mockHttp.patch).toHaveBeenCalledWith('/api/v1/uiconfig/', {});
 	});
 });
+
+// ── Auth IDB sync ─────────────────────────────────────────────────────────────
+
+describe('syncTokensToIdb / clearTokensFromIdb', () => {
+	// These functions dual-write JWT tokens to IndexedDB so the service worker
+	// can refresh auth when replaying queued uploads.
+
+	function createMockAuthIDB() {
+		const kvStore = new Map<string, string>();
+
+		const mockStore = {
+			put: (value: string, key: string) => {
+				kvStore.set(key, value);
+			},
+			get: (key: string) => {
+				const req = {
+					result: null as unknown,
+					onerror: null as unknown,
+					onsuccess: null as unknown
+				};
+				queueMicrotask(() => {
+					req.result = kvStore.get(key) ?? null;
+					(req.onsuccess as (() => void) | null)?.();
+				});
+				return req;
+			},
+			delete: (key: string) => {
+				kvStore.delete(key);
+			}
+		};
+
+		const openRequest = {
+			result: {
+				createObjectStore: vi.fn(),
+				transaction: () => ({
+					objectStore: () => mockStore,
+					oncomplete: null as unknown,
+					onerror: null as unknown
+				})
+			},
+			error: null,
+			onerror: null as unknown,
+			onsuccess: null as unknown,
+			onupgradeneeded: null as unknown
+		};
+
+		vi.stubGlobal('indexedDB', {
+			open: () => {
+				queueMicrotask(() => {
+					(openRequest.onsuccess as (() => void) | null)?.();
+				});
+				return openRequest;
+			}
+		});
+
+		// Patch transaction to auto-fire oncomplete
+		const origTransaction = openRequest.result.transaction;
+		openRequest.result.transaction = (...args: Parameters<typeof origTransaction>) => {
+			const tx = origTransaction(...args);
+			queueMicrotask(() => {
+				(tx.oncomplete as (() => void) | null)?.();
+			});
+			return tx;
+		};
+
+		return kvStore;
+	}
+
+	it('writes access and refresh tokens to IDB', async () => {
+		const kvStore = createMockAuthIDB();
+		const { syncTokensToIdb } = await import('./api');
+
+		await syncTokensToIdb('access123', 'refresh456');
+		expect(kvStore.get('access_token')).toBe('access123');
+		expect(kvStore.get('refresh_token')).toBe('refresh456');
+	});
+
+	it('writes only access token when refresh is omitted', async () => {
+		const kvStore = createMockAuthIDB();
+		const { syncTokensToIdb } = await import('./api');
+
+		await syncTokensToIdb('access789');
+		expect(kvStore.get('access_token')).toBe('access789');
+		expect(kvStore.has('refresh_token')).toBe(false);
+	});
+
+	it('clears tokens from IDB', async () => {
+		const kvStore = createMockAuthIDB();
+		kvStore.set('access_token', 'old');
+		kvStore.set('refresh_token', 'old');
+		const { clearTokensFromIdb } = await import('./api');
+
+		await clearTokensFromIdb();
+		expect(kvStore.has('access_token')).toBe(false);
+		expect(kvStore.has('refresh_token')).toBe(false);
+	});
+
+	it('does not throw when IDB is unavailable', async () => {
+		vi.stubGlobal('indexedDB', {
+			open: () => {
+				const req = {
+					error: new Error('SecurityError'),
+					onerror: null as unknown,
+					onsuccess: null as unknown,
+					onupgradeneeded: null as unknown
+				};
+				queueMicrotask(() => {
+					(req.onerror as (() => void) | null)?.();
+				});
+				return req;
+			}
+		});
+		const { syncTokensToIdb, clearTokensFromIdb } = await import('./api');
+
+		// Should not throw — graceful degradation
+		await expect(syncTokensToIdb('tok')).resolves.toBeUndefined();
+		await expect(clearTokensFromIdb()).resolves.toBeUndefined();
+	});
+});
