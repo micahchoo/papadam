@@ -112,8 +112,8 @@ const uploadSyncPlugin = new BackgroundSyncPlugin('upload-queue', {
 		const freshToken = await refreshAccessToken();
 		if (!freshToken) {
 			notifyClientsAuthExpired();
-			// Don't throw — let Workbox retry later when user logs back in
-			return;
+			// Throw so Workbox knows sync failed and will retry later
+			throw new Error('Auth token refresh failed — will retry on next sync event');
 		}
 
 		let entry: Awaited<ReturnType<typeof queue.shiftRequest>>;
