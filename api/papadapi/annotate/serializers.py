@@ -41,6 +41,10 @@ class AnnotationSerializer(serializers.ModelSerializer):
     media_target = serializers.CharField(
         max_length=100, allow_blank=True, required=False, default=""
     )
+    group = serializers.SerializerMethodField()
+
+    def get_group(self, obj: Annotation) -> int | None:
+        return obj.group_id
 
     class Meta:
         model = Annotation
@@ -60,6 +64,7 @@ class AnnotationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "created_by",
+            "group",
         )
         read_only_fields = (
             "id",

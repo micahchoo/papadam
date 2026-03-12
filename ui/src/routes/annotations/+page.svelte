@@ -53,7 +53,7 @@
 			const params: Record<string, unknown> = { page: currentPage };
 			if (filterGroup) params['group'] = filterGroup;
 			if (filterSearch.trim()) params['search'] = filterSearch.trim();
-			// annotation_type filter passed as searchWhere if set
+			if (filterType) params['annotation_type'] = filterType;
 			const resp = await annoApi.list(params as Parameters<typeof annoApi.list>[0]);
 			if (reset) {
 				annotationList = resp.data.results;
@@ -198,7 +198,7 @@
 								})}
 							</p>
 							<a
-								href="/groups/0/media/{anno.media_reference_id}"
+								href="/groups/{anno.group}/media/{anno.media_reference_id}"
 								class="mt-1 inline-block font-body text-xs text-gray-600 underline-offset-2 hover:underline"
 							>View media</a>
 						</div>

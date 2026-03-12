@@ -203,7 +203,7 @@
 						</div>
 						<div class="mt-1 flex items-center gap-2">
 							<a
-								href="/groups/0/media/{anno.media_reference_id}"
+								href="/groups/{anno.group}/media/{anno.media_reference_id}"
 								class="font-body text-xs text-gray-600 underline-offset-2 hover:underline"
 							>View media</a>
 							<span class="font-body text-xs text-gray-400">

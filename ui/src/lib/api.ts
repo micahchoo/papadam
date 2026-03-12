@@ -108,6 +108,7 @@ export interface Annotation {
 	updated_at: string;
 	/** Nested User object — AnnotationSerializer uses UserSerializer */
 	created_by: User | null;
+	group: number | null;
 }
 
 export type ExhibitBlockType = 'media' | 'annotation';

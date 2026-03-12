@@ -55,6 +55,11 @@ class AnnotationCreateSet(
             elif search_where == "tags":
                 query = Q(tags__name__in=search_query)
 
+        annotation_type = self.request.GET.get("annotation_type")
+        if annotation_type:
+            type_query = Q(annotation_type=annotation_type)
+            query = query & type_query if query else type_query
+
         if self.request.user.is_anonymous:
             group_query = Q(
                 group__in=Group.objects.filter(is_public=True, is_active=True)
