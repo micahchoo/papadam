@@ -33,6 +33,24 @@
 
 	// Cross-media references (marginalia)
 	let mediaRefs = $state<Annotation[]>([]);
+	let annotationError = $state<string | null>(null);
+	let annotationRetrying = $state(false);
+
+	async function loadAnnotations(): Promise<void> {
+		annotationError = null;
+		annotationRetrying = false;
+		try {
+			const annoResp = await annoApi.byMedia(mediaUuid);
+			annotations = annoResp.data;
+		} catch {
+			annotationError = 'Annotations unavailable';
+		}
+	}
+
+	function retryAnnotations(): void {
+		annotationRetrying = true;
+		void loadAnnotations().finally(() => { annotationRetrying = false; });
+	}
 
 	/** Image annotations whose annotation_image is set — passed to MediaPlayer for overlay. */
 	const imageAnnotations = $derived(
@@ -59,12 +77,7 @@
 			loading = false;
 		}
 		// Load annotations independently — don't block player render
-		try {
-			const annoResp = await annoApi.byMedia(mediaUuid);
-			annotations = annoResp.data;
-		} catch {
-			// Annotations fail silently — player still works
-		}
+		await loadAnnotations();
 		// Load cross-media references
 		try {
 			const { data } = await mediaRelation.mediaRefs(mediaUuid);
@@ -260,13 +273,24 @@
 							+ New
 						</button>
 					</div>
-					<AnnotationViewer
-						{annotations}
-						onPlaySnippet={handlePlaySnippet}
-						{formatTime}
-						onAnnotationDeleted={handleAnnotationDeleted}
-						onAnnotationUpdated={handleAnnotationUpdated}
-					/>
+					{#if annotationError}
+						<div class="py-4 text-center">
+							<p class="mb-2 font-body text-sm text-red-700">{annotationError}</p>
+							<button
+								class="font-body text-sm text-gray-600 underline-offset-2 hover:underline"
+								disabled={annotationRetrying}
+								onclick={retryAnnotations}
+							>{annotationRetrying ? 'Retrying...' : 'Retry'}</button>
+						</div>
+					{:else}
+						<AnnotationViewer
+							{annotations}
+							onPlaySnippet={handlePlaySnippet}
+							{formatTime}
+							onAnnotationDeleted={handleAnnotationDeleted}
+							onAnnotationUpdated={handleAnnotationUpdated}
+						/>
+					{/if}
 				</div>
 			</aside>
 		</div>

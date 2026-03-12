@@ -2,9 +2,27 @@
 	import DOMPurify from 'dompurify';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { groups, archive } from '$lib/api';
+	import { groups, archive, importexport } from '$lib/api';
 	import type { MediaStore } from '$lib/api';
 	import { selectedGroup, groupMediaList, dateLocale, isAuthenticated } from '$lib/stores';
+
+	let exportMsg = $state<string | null>(null);
+	let exportError = $state<string | null>(null);
+	let exporting = $state(false);
+
+	async function requestExport(): Promise<void> {
+		exporting = true;
+		exportMsg = null;
+		exportError = null;
+		try {
+			await importexport.requestExport(groupId);
+			exportMsg = 'Export requested — check Settings for status.';
+		} catch {
+			exportError = 'Failed to request export.';
+		} finally {
+			exporting = false;
+		}
+	}
 	import UploadMediaModal from '$lib/components/UploadMediaModal.svelte';
 	import SearchSort from '$lib/components/SearchSort.svelte';
 
@@ -13,6 +31,10 @@
 	let showUploadModal = $state(false);
 	let sortedRecordings = $state<MediaStore[]>([]);
 	let filteredRecordings = $state<MediaStore[]>([]);
+	let hasMore = $state(false);
+	let currentPage = $state(1);
+	let loadingMore = $state(false);
+	let loadMoreError = $state<string | null>(null);
 
 	const groupId = $derived(parseInt($page.params['id'] ?? '0', 10));
 
@@ -24,12 +46,38 @@
 			]);
 			selectedGroup.set(groupResp.data);
 			groupMediaList.set(archiveResp.data.results);
+			hasMore = archiveResp.data.next !== null;
 		} catch {
 			error = 'Failed to load collection.';
 		} finally {
 			loading = false;
 		}
 	});
+
+	async function loadMore(): Promise<void> {
+		loadingMore = true;
+		loadMoreError = null;
+		try {
+			currentPage += 1;
+			const { data } = await archive.list({
+				searchFrom: 'selected_collections',
+				searchCollections: String(groupId),
+				page: currentPage
+			});
+			groupMediaList.update((list) => [...list, ...data.results]);
+			hasMore = data.next !== null;
+		} catch {
+			currentPage -= 1;
+			loadMoreError = 'Failed to load more — tap to retry';
+		} finally {
+			loadingMore = false;
+		}
+	}
+
+	function retryLoadMore(): void {
+		loadMoreError = null;
+		void loadMore();
+	}
 </script>
 
 <div class="mx-auto max-w-6xl px-4 py-6">
@@ -45,16 +93,31 @@
 				{@html DOMPurify.sanitize($selectedGroup.description)}
 			</p>
 			{#if $isAuthenticated}
-				<button
-					class="mt-4 border border-gray-900 px-5 py-2 font-body text-sm font-medium tracking-wide hover:bg-gray-900 hover:text-white"
-					onclick={() => (showUploadModal = true)}
-				>
-					Upload Media
-				</button>
+				<div class="mt-4 flex items-center gap-3">
+					<button
+						class="border border-gray-900 px-5 py-2 font-body text-sm font-medium tracking-wide hover:bg-gray-900 hover:text-white"
+						onclick={() => (showUploadModal = true)}
+					>
+						Upload Media
+					</button>
+					<button
+						class="border border-gray-300 px-4 py-2 font-body text-xs tracking-wide hover:bg-gray-100"
+						disabled={exporting}
+						onclick={() => void requestExport()}
+					>
+						{exporting ? 'Exporting...' : 'Export'}
+					</button>
+				</div>
+				{#if exportMsg}
+					<p class="mt-2 font-body text-sm text-green-700">{exportMsg}</p>
+				{/if}
+				{#if exportError}
+					<p class="mt-2 font-body text-sm text-red-700">{exportError}</p>
+				{/if}
 			{/if}
 		</header>
 
-		<SearchSort bind:sortedRecordings bind:filteredRecordings />
+		<SearchSort bind:sortedRecordings bind:filteredRecordings {groupId} />
 
 		{#if $groupMediaList.length === 0}
 			<p class="py-12 text-center font-body text-sm text-gray-400">No media uploaded yet.</p>
@@ -109,6 +172,25 @@
 					</article>
 				{/each}
 			</div>
+
+			{#if loadMoreError}
+				<div class="mt-6 text-center">
+					<button
+						class="font-body text-sm text-red-600 underline-offset-2 hover:underline"
+						onclick={retryLoadMore}
+					>{loadMoreError}</button>
+				</div>
+			{:else if hasMore}
+				<div class="mt-6 text-center">
+					<button
+						onclick={() => void loadMore()}
+						disabled={loadingMore}
+						class="border border-gray-900 px-6 py-2 font-body text-sm tracking-wide hover:bg-gray-900 hover:text-white disabled:opacity-50"
+					>
+						{loadingMore ? 'Loading...' : 'Load More'}
+					</button>
+				</div>
+			{/if}
 		{/if}
 	{/if}
 </div>
