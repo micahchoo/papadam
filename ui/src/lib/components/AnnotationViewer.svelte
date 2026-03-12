@@ -261,8 +261,8 @@
 			</div>
 		{/if}
 
-		<!-- Recursive children -->
-		{#if allRepliesFor(annotation.id).length > 0}
+		<!-- Recursive children (capped to prevent runaway recursion on malformed data) -->
+		{#if depth < MAX_REPLY_DEPTH && allRepliesFor(annotation.id).length > 0}
 			<ul class="mt-3 space-y-2 border-l-2 border-gray-200 pl-4">
 				{#each allRepliesFor(annotation.id) as reply}
 					{@render annotationThread({ ...reply, timeParts: getTimeParts(reply.media_target) }, depth + 1)}
