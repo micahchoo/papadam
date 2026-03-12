@@ -57,14 +57,27 @@ export async function getQueuedUploads(): Promise<QueuedUpload[]> {
 
 /** Remove a single entry from the Background Sync queue. */
 export async function discardUpload(id: number): Promise<void> {
-	const db = await openDb();
-	return new Promise((resolve, reject) => {
-		const tx = db.transaction(STORE_NAME, 'readwrite');
-		const store = tx.objectStore(STORE_NAME);
-		const request = store.delete(id);
-		request.onerror = () => reject(request.error);
-		request.onsuccess = () => resolve();
-	});
+	try {
+		const db = await openDb();
+		return await new Promise((resolve, reject) => {
+			const tx = db.transaction(STORE_NAME, 'readwrite');
+			const store = tx.objectStore(STORE_NAME);
+			const request = store.delete(id);
+			request.onerror = () => reject(request.error);
+			request.onsuccess = () => resolve();
+		});
+	} catch {
+		// DB may not exist — nothing to discard
+	}
+}
+
+/** Request the service worker to re-trigger Background Sync for the upload queue. */
+export async function retryUploads(): Promise<void> {
+	if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+		const reg = await navigator.serviceWorker.ready;
+		// @ts-expect-error — Background Sync API types not in lib.dom yet
+		await reg.sync.register('workbox-background-sync:upload-queue');
+	}
 }
 
 /** Get count of pending uploads. */

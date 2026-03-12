@@ -152,6 +152,20 @@ describe('upload-queue', () => {
 		expect(count).toBe(2);
 	});
 
+	it('discardUpload does not throw when DB does not exist', async () => {
+		vi.stubGlobal('indexedDB', {
+			open: () => {
+				const req = { error: new Error('NotFoundError'), onerror: null as unknown, onsuccess: null as unknown };
+				queueMicrotask(() => {
+					(req.onerror as (() => void) | null)?.();
+				});
+				return req;
+			}
+		});
+
+		await expect(discardUpload(999)).resolves.toBeUndefined();
+	});
+
 	it('handles empty queue', async () => {
 		createMockIDB([]);
 		const uploads = await getQueuedUploads();

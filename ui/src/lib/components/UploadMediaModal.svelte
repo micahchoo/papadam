@@ -4,7 +4,7 @@
 	import { pollJob } from '$lib/events';
 	import type { JobPoller } from '$lib/events';
 	import { selectedGroupDetails, groupMediaList } from '$lib/stores';
-	import { getQueuedUploads, discardUpload, type QueuedUpload } from '$lib/upload-queue';
+	import { getQueuedUploads, discardUpload, retryUploads, type QueuedUpload } from '$lib/upload-queue';
 
 	interface Props {
 		showUploadModal: boolean;
@@ -202,9 +202,17 @@
 
 			{#if queuedUploads.length > 0}
 				<div class="mt-6 border-t border-gray-200 pt-4">
-					<h3 class="mb-2 text-sm font-semibold text-gray-500">
-						Pending uploads ({queuedUploads.length})
-					</h3>
+					<div class="mb-2 flex items-center justify-between">
+						<h3 class="text-sm font-semibold text-gray-500">
+							Pending uploads ({queuedUploads.length})
+						</h3>
+						<button
+							class="font-body text-xs text-blue-600 hover:underline"
+							onclick={() => void retryUploads()}
+						>
+							Retry all
+						</button>
+					</div>
 					<ul class="space-y-2">
 						{#each queuedUploads as upload (upload.id)}
 							<li class="flex items-center justify-between rounded bg-amber-50 px-3 py-2 text-sm">
