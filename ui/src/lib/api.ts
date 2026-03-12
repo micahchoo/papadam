@@ -285,7 +285,7 @@ export const auth = {
 	login: (username: string, password: string) =>
 		http.post<TokenPair>('/auth/jwt/create/', { username, password }),
 
-	refresh: (refresh: string) => http.post<{ access: string }>('/auth/jwt/refresh/', { refresh }),
+	// auth.refresh removed — token refresh is handled by the 401 interceptor above.
 
 	me: () => http.get<User>('/auth/users/me/'),
 
@@ -433,20 +433,10 @@ export const exhibits = {
 };
 
 // ── CRDT ──────────────────────────────────────────────────────────────────────
+// crdt.loadState and crdt.saveState removed — CRDT sync is handled by the
+// crdt/ Node server directly over WebSocket, not via the REST API.
 
-export const crdt = {
-	/** Load binary Y.js state for a media item */
-	loadState: (mediaUuid: string) =>
-		http.get<ArrayBuffer>(`/api/v1/crdt/${mediaUuid}/`, {
-			responseType: 'arraybuffer'
-		}),
-
-	/** Persist binary Y.js state delta */
-	saveState: (mediaUuid: string, binary: Uint8Array) =>
-		http.put<void>(`/api/v1/crdt/${mediaUuid}/`, binary, {
-			headers: { 'Content-Type': 'application/octet-stream' }
-		})
-};
+export const crdt = {};
 
 // ── Events / Job status ───────────────────────────────────────────────────────
 

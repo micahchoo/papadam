@@ -160,6 +160,7 @@
 					</div>
 				{/if}
 			</div>
+			<!-- Phase 5: waveform renderer — gated by showWaveform store -->
 			<div class="mt-2 flex items-center justify-center gap-4">
 				<button
 					onclick={() => skip(-$playerSkipSeconds[0])}

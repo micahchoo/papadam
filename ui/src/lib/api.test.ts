@@ -45,7 +45,6 @@ import {
 	groups,
 	tags,
 	exhibits,
-	crdt,
 	events,
 	importexport,
 	mediaRelation,
@@ -72,10 +71,7 @@ describe('auth', () => {
 		expect(mockHttp.get).toHaveBeenCalledWith('/auth/users/me/');
 	});
 
-	it('refresh posts to /auth/jwt/refresh/', () => {
-		auth.refresh('refresh-tok');
-		expect(mockHttp.post).toHaveBeenCalledWith('/auth/jwt/refresh/', { refresh: 'refresh-tok' });
-	});
+	// auth.refresh removed — handled by 401 interceptor
 
 	it('register posts to /auth/users/', () => {
 		auth.register({
@@ -475,47 +471,7 @@ describe('exhibits', () => {
 	});
 });
 
-describe('crdt', () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-	});
-
-	// ── Route contract ──────────────────────────────────────────────────────
-
-	it('loadState gets /api/v1/crdt/{uuid}/ as arraybuffer', () => {
-		crdt.loadState('media-uuid-1');
-		expect(mockHttp.get).toHaveBeenCalledWith('/api/v1/crdt/media-uuid-1/', {
-			responseType: 'arraybuffer'
-		});
-	});
-
-	it('saveState puts binary to /api/v1/crdt/{uuid}/', () => {
-		const bytes = new Uint8Array([1, 2, 3]);
-		crdt.saveState('media-uuid-1', bytes);
-		expect(mockHttp.put).toHaveBeenCalledWith('/api/v1/crdt/media-uuid-1/', bytes, {
-			headers: { 'Content-Type': 'application/octet-stream' }
-		});
-	});
-
-	// ── Response handling ────────────────────────────────────────────────────
-
-	it('loadState resolves with ArrayBuffer data', async () => {
-		const buf = new ArrayBuffer(8);
-		mockHttp.get.mockResolvedValueOnce({ data: buf });
-		const resp = await crdt.loadState('media-uuid-1');
-		expect(resp.data).toBeInstanceOf(ArrayBuffer);
-	});
-
-	// ── Adversarial ─────────────────────────────────────────────────────────
-
-	it('saveState with empty Uint8Array still calls endpoint', () => {
-		const empty = new Uint8Array(0);
-		crdt.saveState('media-uuid-1', empty);
-		expect(mockHttp.put).toHaveBeenCalledWith('/api/v1/crdt/media-uuid-1/', empty, {
-			headers: { 'Content-Type': 'application/octet-stream' }
-		});
-	});
-});
+// crdt.loadState/saveState tests removed — CRDT sync moved to WebSocket server
 
 describe('events', () => {
 	beforeEach(() => {

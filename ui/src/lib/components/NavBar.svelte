@@ -7,24 +7,32 @@
 		const active = exact
 			? $page.url.pathname === path
 			: $page.url.pathname === path || $page.url.pathname.startsWith(path + '/');
-		return `font-medium text-white hover:text-gray-400${active ? ' underline underline-offset-4 decoration-2' : ''}`;
+		return `font-body text-sm tracking-wide hover:underline underline-offset-4${active ? ' underline font-semibold' : ''}`;
 	}
 </script>
 
-<nav class="sticky top-0 z-50 flex w-full justify-between bg-brand-primary p-5">
-	<div class="flex items-center justify-center">
-		<a href="/" class="flex items-center text-2xl font-semibold text-white">
+<nav
+	class="sticky top-0 z-50 border-b-2 border-gray-900"
+	style="background-color: var(--brand-primary, #1e3a5f);"
+>
+	<div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+		<!-- Brand / Masthead -->
+		<a href="/" class="flex items-center gap-2 text-white">
 			{#if $uiConfig?.brand_logo_url}
-				<img src={$uiConfig.brand_logo_url} alt="" class="mr-2 h-8" />
+				<img src={$uiConfig.brand_logo_url} alt="" class="h-8" />
 			{/if}
-			<h1>{$uiConfig?.brand_name ?? 'Papad.alt'}</h1>
+			<h1 class="font-heading text-2xl font-black tracking-tight">
+				{$uiConfig?.brand_name ?? 'Papad.alt'}
+			</h1>
 		</a>
-	</div>
 
-	<div class="flex justify-center">
-		<div class="flex flex-wrap space-x-4 text-center">
+		<!-- Navigation links -->
+		<div class="flex flex-wrap items-center gap-4 text-white">
 			<a href="/" class={navClass('/', true)}>{m.nav_home()}</a>
 			<a href="/groups" class={navClass('/groups')}>{m.nav_collections()}</a>
+			{#if $isAuthenticated}
+				<a href="/annotations" class={navClass('/annotations')}>{m.nav_annotations()}</a>
+			{/if}
 			{#if $exhibitEnabled}
 				<a href="/exhibits" class={navClass('/exhibits')}>{m.nav_exhibits()}</a>
 			{/if}

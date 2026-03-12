@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import DOMPurify from 'dompurify';
-	import { archive, annotations as annoApi } from '$lib/api';
+	import { archive, annotations as annoApi, mediaRelation } from '$lib/api';
 	import type { MediaStore, Annotation } from '$lib/api';
 	import { showTranscript, dateLocale } from '$lib/stores';
 	import AnnotationViewer from '$lib/components/AnnotationViewer.svelte';
@@ -30,6 +30,9 @@
 	let mediaPlayerRef = $state<{ playSnippet: (start: number, end: number) => void } | null>(null);
 	let transcriptText = $state<string | null>(null);
 	let loadingTranscript = $state(false);
+
+	// Cross-media references (marginalia)
+	let mediaRefs = $state<Annotation[]>([]);
 
 	/** Image annotations whose annotation_image is set — passed to MediaPlayer for overlay. */
 	const imageAnnotations = $derived(
@@ -61,6 +64,13 @@
 			annotations = annoResp.data;
 		} catch {
 			// Annotations fail silently — player still works
+		}
+		// Load cross-media references
+		try {
+			const { data } = await mediaRelation.mediaRefs(mediaUuid);
+			mediaRefs = data;
+		} catch {
+			// Silently fail — marginalia is supplementary
 		}
 	});
 
@@ -103,6 +113,10 @@
 		annotations = annotations.filter((a) => a.id !== id);
 	}
 
+	function handleAnnotationUpdated(updated: Annotation) {
+		annotations = annotations.map((a) => (a.uuid === updated.uuid ? updated : a));
+	}
+
 	function editMedia() {
 		if (!recording) return;
 		mediaName = recording.name;
@@ -128,124 +142,156 @@
 </script>
 
 {#if loading}
-	<div class="flex h-screen items-center justify-center"><p>Loading...</p></div>
+	<div class="flex h-screen items-center justify-center">
+		<p class="font-body text-gray-500">Loading...</p>
+	</div>
 {:else if error}
-	<div class="rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
+	<div class="mx-4 mt-4 border border-red-300 bg-red-50 px-4 py-3 font-body text-sm text-red-700" role="alert">
 		<span>{error}</span>
 	</div>
 {:else if recording}
-	{#if error}
-		<div class="mx-4 mt-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
-			<span>{error}</span>
-		</div>
-	{/if}
-	<div class="mx-auto flex h-full max-w-5xl flex-col md:h-screen md:flex-row">
-		<!-- Left: player + metadata -->
-		<div class="w-full flex-shrink-0 overflow-y-auto p-6 md:w-1/2">
+	<div class="mx-auto max-w-6xl px-4 py-6">
+		<!-- Back + options -->
+		<div class="mb-4 flex items-center justify-between">
+			<button
+				class="font-body text-sm text-gray-500 hover:underline"
+				onclick={() => window.history.back()}
+			>&larr; Back</button>
 			<div class="relative">
-				<button class="mb-2 text-sm text-blue-600 underline" onclick={() => window.history.back()}
-					>← Back</button
-				>
 				<button
-					class="absolute right-0 top-0 rounded bg-gray-200 px-3 py-1 text-sm"
+					class="px-3 py-1 font-body text-sm text-gray-500 hover:bg-gray-100"
 					onclick={() => (showMenu = !showMenu)}
-					aria-label="Options">⋮</button
-				>
+					aria-label="Options"
+				>&hellip;</button>
 				{#if showMenu}
-					<div class="absolute right-0 top-8 z-10 rounded bg-white shadow-md">
+					<div class="absolute right-0 top-8 z-10 border border-gray-200 bg-white shadow-sm">
 						<button
-							class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-							onclick={editMedia}>Edit</button
-						>
+							class="block w-full px-4 py-2 text-left font-body text-sm hover:bg-gray-50"
+							onclick={editMedia}>Edit</button>
 						<button
-							class="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
+							class="block w-full px-4 py-2 text-left font-body text-sm text-red-600 hover:bg-gray-50"
 							onclick={() => {
 								showDeleteConfirmation = true;
 								showMenu = false;
-							}}>Delete</button
-						>
+							}}>Delete</button>
 					</div>
 				{/if}
 			</div>
-
-			{#if recording.upload}
-				<MediaPlayer
-					bind:this={mediaPlayerRef}
-					src={recording.upload}
-					controls={true}
-					{imageAnnotations}
-					transcriptUrl={recording.transcript_vtt_url}
-				/>
-			{:else}
-				<div class="flex h-48 items-center justify-center rounded bg-gray-200 text-sm text-gray-600">
-					Media is being processed. Refresh the page to check progress.
-				</div>
-			{/if}
-			{#if $showTranscript && recording.transcript_vtt_url}
-				<div class="mt-3">
-					{#if transcriptText === null}
-						<button
-							class="text-sm text-blue-600 underline"
-							onclick={() => {
-							if (recording?.transcript_vtt_url) void loadTranscript(recording.transcript_vtt_url);
-						}}
-						>
-							Show transcript
-						</button>
-					{:else if loadingTranscript}
-						<p class="text-sm text-gray-500">Loading transcript…</p>
-					{:else if transcriptText}
-						<details open>
-							<summary class="cursor-pointer text-sm font-medium text-gray-700">Transcript</summary>
-							<p class="mt-2 text-sm leading-relaxed text-gray-600">{transcriptText}</p>
-						</details>
-					{:else}
-						<p class="text-sm text-gray-400">Transcript unavailable.</p>
-					{/if}
-				</div>
-			{/if}
-
-			<h1 class="mt-4 text-2xl font-bold">{recording.name}</h1>
-			<p class="text-sm text-gray-500">
-				{new Date(recording.created_at).toLocaleDateString($dateLocale)}
-			</p>
-			<div class="py-2">
-				{#each recording.tags as tag}
-					{#if tag.name && tag.count > 0 && tag.name.length <= 30}
-						<span
-							class="mr-1 inline-flex bg-gray-200 px-2 py-1 text-xs font-semibold uppercase text-gray-600"
-						>
-							{tag.name}
-						</span>
-					{/if}
-				{/each}
-			</div>
-			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-			<p class="my-3">{@html DOMPurify.sanitize(recording.description)}</p>
 		</div>
 
-		<!-- Right: annotations -->
-		<div class="overflow-y-auto p-6 md:w-1/2">
-			<div class="bg-gray-100">
-				<div class="sticky top-0 z-10 flex flex-col bg-gray-100">
-					<h3 class="py-4 text-lg font-semibold">Annotations</h3>
-					<button
-						class="mb-4 rounded bg-brand-accent px-4 py-2 text-white hover:opacity-90 md:w-1/2"
-						onclick={() => (showAnnotationModal = true)}
-					>
-						+ Create Annotation
-					</button>
-				</div>
-							<div class="mt-2">
-						<AnnotationViewer
-							{annotations}
-							onPlaySnippet={handlePlaySnippet}
-							{formatTime}
-							onAnnotationDeleted={handleAnnotationDeleted}
-						/>
+		<!-- Main layout: media + annotations side-by-side (newspaper editorial) -->
+		<div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
+			<!-- Left column: player + metadata -->
+			<div class="lg:col-span-7">
+				{#if recording.upload}
+					<MediaPlayer
+						bind:this={mediaPlayerRef}
+						src={recording.upload}
+						controls={true}
+						{imageAnnotations}
+						transcriptUrl={recording.transcript_vtt_url}
+					/>
+				{:else}
+					<div class="flex h-48 items-center justify-center bg-gray-100 font-body text-sm text-gray-500">
+						Media is being processed. Refresh the page to check progress.
 					</div>
+				{/if}
+
+				{#if $showTranscript && recording.transcript_vtt_url}
+					<div class="mt-3">
+						{#if transcriptText === null}
+							<button
+								class="font-body text-sm text-gray-500 underline"
+								onclick={() => {
+									if (recording?.transcript_vtt_url) void loadTranscript(recording.transcript_vtt_url);
+								}}
+							>
+								Show transcript
+							</button>
+						{:else if loadingTranscript}
+							<p class="font-body text-sm text-gray-400">Loading transcript…</p>
+						{:else if transcriptText}
+							<details open>
+								<summary class="cursor-pointer font-body text-sm font-medium text-gray-700">Transcript</summary>
+								<p class="mt-2 font-body text-sm leading-relaxed text-gray-600">{transcriptText}</p>
+							</details>
+						{:else}
+							<p class="font-body text-sm text-gray-400">Transcript unavailable.</p>
+						{/if}
+					</div>
+				{/if}
+
+				<header class="mt-6 border-b border-gray-200 pb-4">
+					<h1 class="font-heading text-3xl font-black tracking-tight">{recording.name}</h1>
+					<p class="mt-1 font-body text-sm text-gray-500">
+						{new Date(recording.created_at).toLocaleDateString($dateLocale, {
+							day: 'numeric',
+							month: 'short',
+							year: 'numeric'
+						})}
+					</p>
+					{#if recording.tags.length > 0}
+						<div class="mt-2 flex flex-wrap gap-2">
+							{#each recording.tags as tag}
+								{#if tag.name && tag.count > 0 && tag.name.length <= 30}
+									<span class="font-body text-xs uppercase tracking-wider text-gray-500">
+										{tag.name}
+									</span>
+								{/if}
+							{/each}
+						</div>
+					{/if}
+				</header>
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+				<div class="mt-4 font-body leading-relaxed text-gray-700">
+					{@html DOMPurify.sanitize(recording.description)}
+				</div>
 			</div>
+
+			<!-- Right column: annotations as editorial marginalia -->
+			<aside class="border-l border-gray-200 pl-6 lg:col-span-5">
+				<div class="sticky top-20">
+					<div class="mb-4 flex items-baseline justify-between border-b border-gray-900 pb-2">
+						<h3 class="font-heading text-lg font-bold">Annotations</h3>
+						<button
+							class="border border-gray-900 px-3 py-1 font-body text-xs tracking-wide hover:bg-gray-900 hover:text-white"
+							onclick={() => (showAnnotationModal = true)}
+						>
+							+ New
+						</button>
+					</div>
+					<AnnotationViewer
+						{annotations}
+						onPlaySnippet={handlePlaySnippet}
+						{formatTime}
+						onAnnotationDeleted={handleAnnotationDeleted}
+						onAnnotationUpdated={handleAnnotationUpdated}
+					/>
+				</div>
+			</aside>
 		</div>
+
+		<!-- Cross-media references ("See also" marginalia) — below on mobile, sidebar on desktop -->
+		{#if mediaRefs.length > 0}
+			<section class="mt-10 border-t border-gray-200 pt-6 lg:mt-8">
+				<h3 class="mb-3 font-heading text-lg font-bold">Referenced in</h3>
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+					{#each mediaRefs as ref}
+						<a
+							href="/groups/{recording.group.id}/media/{ref.media_reference_id}"
+							class="block border-l-2 border-gray-300 py-2 pl-4 hover:border-gray-900"
+						>
+							<p class="font-body text-sm font-medium text-gray-900">
+								{ref.media_reference_id}
+							</p>
+							<p class="mt-1 line-clamp-2 font-body text-xs text-gray-500">
+								{ref.annotation_text || 'No description'}
+							</p>
+						</a>
+					{/each}
+				</div>
+			</section>
+		{/if}
 	</div>
 
 	{#if showAnnotationModal}
@@ -262,19 +308,17 @@
 	{/if}
 
 	{#if showDeleteConfirmation}
-		<div class="fixed inset-0 z-10 flex items-center justify-center bg-black bg-opacity-50">
-			<div class="rounded-lg bg-white p-6 shadow-lg">
-				<h2 class="text-lg font-semibold">Confirm Delete</h2>
-				<p class="mt-2 text-gray-700">Are you sure you want to delete this media?</p>
-				<div class="mt-4 flex justify-end space-x-4">
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+			<div class="border border-gray-200 bg-white p-6 shadow-lg">
+				<h2 class="font-heading text-lg font-bold">Confirm Delete</h2>
+				<p class="mt-2 font-body text-sm text-gray-700">Are you sure you want to delete this media?</p>
+				<div class="mt-4 flex justify-end gap-3">
 					<button
-						class="rounded bg-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-400"
-						onclick={() => (showDeleteConfirmation = false)}>Cancel</button
-					>
+						class="border border-gray-300 px-4 py-2 font-body text-sm hover:bg-gray-100"
+						onclick={() => (showDeleteConfirmation = false)}>Cancel</button>
 					<button
-						class="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600"
-						onclick={() => void deleteMedia()}>Delete</button
-					>
+						class="border border-red-500 px-4 py-2 font-body text-sm text-red-600 hover:bg-red-50"
+						onclick={() => void deleteMedia()}>Delete</button>
 				</div>
 			</div>
 		</div>

@@ -2,12 +2,12 @@
  * Unit tests for NavBar.svelte
  *
  * Verifies navigation link rendering, auth-dependent visibility,
- * exhibit feature gating, and brand text display.
+ * exhibit feature gating, annotations link gating, and brand text display.
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import { writable, derived } from 'svelte/store';
+import { writable } from 'svelte/store';
 
 // ── Mock $app/stores (page store) ──────────────────────────────────────────────
 const mockPage = writable({ url: new URL('http://localhost/') });
@@ -17,6 +17,7 @@ vi.mock('$app/stores', () => ({ page: mockPage }));
 vi.mock('$lib/i18n/messages', () => ({
 	nav_home: () => 'Home',
 	nav_collections: () => 'Collections',
+	nav_annotations: () => 'Annotations',
 	nav_exhibits: () => 'Exhibits',
 	nav_settings: () => 'Settings',
 	nav_logout: () => 'Logout',
@@ -67,6 +68,20 @@ describe('NavBar', () => {
 		expect(screen.queryByText('Exhibits')).not.toBeInTheDocument();
 	});
 
+	// ── Annotations link (auth-gated) ───────────────────────────────────────
+
+	it('shows Annotations link when user is authenticated', () => {
+		mockIsAuthenticated.set(true);
+		render(NavBar);
+		expect(screen.getByText('Annotations')).toBeInTheDocument();
+	});
+
+	it('hides Annotations link when user is not authenticated', () => {
+		mockIsAuthenticated.set(false);
+		render(NavBar);
+		expect(screen.queryByText('Annotations')).not.toBeInTheDocument();
+	});
+
 	// ── Auth-dependent items ─────────────────────────────────────────────────
 
 	it('shows Login link when user is not authenticated', () => {
@@ -112,12 +127,8 @@ describe('NavBar', () => {
 	// ── Adversarial ──────────────────────────────────────────────────────────
 
 	it('handles empty brand_name gracefully by showing fallback', () => {
-		// brand_name is empty string, nullish coalescing (??) does not catch ''
-		// so it shows empty — this documents the actual behavior
 		mockUiConfig.set({ brand_name: '', brand_logo_url: '' });
 		render(NavBar);
-		// Empty brand_name is falsy but not null/undefined, so ?? won't trigger
-		// The heading should exist but be empty
 		const heading = screen.getByRole('heading', { level: 1 });
 		expect(heading).toBeInTheDocument();
 	});

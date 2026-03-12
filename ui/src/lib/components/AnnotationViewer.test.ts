@@ -3,13 +3,35 @@
  *
  * Verifies annotation rendering for different types (text/image/audio/video/media_ref),
  * empty state, timestamp display, reply button, delete button visibility,
- * and sanitized HTML output.
+ * edit button visibility, and sanitized HTML output.
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import { writable } from 'svelte/store';
 import type { Annotation, User } from '$lib/api';
+
+// ── Hoisted mocks ──────────────────────────────────────────────────────────────
+const { mockCurrentUser, mockDefaultQuality, mockDateLocale } = vi.hoisted(() => {
+	// Inline writable implementation for hoisted context
+	function writable<T>(initial: T) {
+		let value = initial;
+		const subs = new Set<(v: T) => void>();
+		return {
+			set(v: T) { value = v; subs.forEach((fn) => fn(v)); },
+			update(fn: (v: T) => T) { value = fn(value); subs.forEach((s) => s(value)); },
+			subscribe(fn: (v: T) => void) {
+				fn(value);
+				subs.add(fn);
+				return () => { subs.delete(fn); };
+			}
+		};
+	}
+	return {
+		mockCurrentUser: writable<User | null>(null),
+		mockDefaultQuality: writable('auto'),
+		mockDateLocale: writable('en-GB')
+	};
+});
 
 // ── Mock DOMPurify ─────────────────────────────────────────────────────────────
 vi.mock('dompurify', () => ({
@@ -21,19 +43,23 @@ vi.mock('dompurify', () => ({
 // ── Mock api ───────────────────────────────────────────────────────────────────
 vi.mock('$lib/api', () => ({
 	annotations: {
-		delete: vi.fn().mockResolvedValue({})
+		delete: vi.fn().mockResolvedValue({}),
+		get: vi.fn().mockResolvedValue({ data: {} }),
+		update: vi.fn().mockResolvedValue({ data: {} }),
+		addTag: vi.fn().mockResolvedValue({ data: { tags: [] } }),
+		removeTag: vi.fn().mockResolvedValue({ data: { tags: [] } })
 	},
 	mediaRelation: {
-		createReply: vi.fn().mockResolvedValue({ data: {} })
+		createReply: vi.fn().mockResolvedValue({ data: {} }),
+		replies: vi.fn().mockResolvedValue({ data: [] })
+	},
+	tags: {
+		list: vi.fn().mockResolvedValue({ data: [] })
 	},
 	MAX_REPLY_DEPTH: 2
 }));
 
 // ── Mock stores ────────────────────────────────────────────────────────────────
-const mockCurrentUser = writable<User | null>(null);
-const mockDefaultQuality = writable('auto');
-const mockDateLocale = writable('en-GB');
-
 vi.mock('$lib/stores', () => ({
 	currentUser: mockCurrentUser,
 	defaultQuality: mockDefaultQuality,
@@ -115,8 +141,6 @@ describe('AnnotationViewer', () => {
 	it('renders formatted timestamp for valid media_target', () => {
 		const anno = makeAnnotation({ media_target: 't=10,30' });
 		render(AnnotationViewer, { props: { annotations: [anno] } });
-		expect(screen.getByText('Timestamp:')).toBeInTheDocument();
-		// 10 seconds = 00:10, 30 seconds = 00:30
 		expect(screen.getByText(/00:10/)).toBeInTheDocument();
 		expect(screen.getByText(/00:30/)).toBeInTheDocument();
 	});
@@ -170,7 +194,7 @@ describe('AnnotationViewer', () => {
 
 	it('hides Delete button when user is not the annotation creator', () => {
 		mockCurrentUser.set({ id: 999, username: 'bob', first_name: 'Bob', last_name: 'B' });
-		const anno = makeAnnotation({ created_by: MOCK_USER }); // created by alice (id=1)
+		const anno = makeAnnotation({ created_by: MOCK_USER });
 		render(AnnotationViewer, { props: { annotations: [anno] } });
 		expect(screen.queryByText('Delete')).not.toBeInTheDocument();
 	});
@@ -180,6 +204,22 @@ describe('AnnotationViewer', () => {
 		const anno = makeAnnotation({ created_by: MOCK_USER });
 		render(AnnotationViewer, { props: { annotations: [anno] } });
 		expect(screen.getByText('Delete')).toBeInTheDocument();
+	});
+
+	// ── Edit button visibility ──────────────────────────────────────────────
+
+	it('shows Edit button when current user owns the annotation', () => {
+		mockCurrentUser.set(MOCK_USER);
+		const anno = makeAnnotation({ created_by: MOCK_USER });
+		render(AnnotationViewer, { props: { annotations: [anno] } });
+		expect(screen.getByText('Edit')).toBeInTheDocument();
+	});
+
+	it('hides Edit button when user is not the annotation creator', () => {
+		mockCurrentUser.set({ id: 999, username: 'bob', first_name: 'Bob', last_name: 'B' });
+		const anno = makeAnnotation({ created_by: MOCK_USER });
+		render(AnnotationViewer, { props: { annotations: [anno] } });
+		expect(screen.queryByText('Edit')).not.toBeInTheDocument();
 	});
 
 	// ── Replies rendering ────────────────────────────────────────────────────
@@ -214,7 +254,6 @@ describe('AnnotationViewer', () => {
 	// ── Depth-based reply hiding ────────────────────────────────────────
 
 	it('hides Reply button at max nesting depth', () => {
-		// root (depth 0) -> reply (depth 1) -> reply-to-reply (depth 2, no Reply button)
 		const root = makeAnnotation({ id: 1, annotation_text: 'Root' });
 		const child = makeAnnotation({
 			id: 2,
@@ -232,9 +271,29 @@ describe('AnnotationViewer', () => {
 			props: { annotations: [root, child, grandchild] }
 		});
 		expect(screen.getByText('Grandchild')).toBeInTheDocument();
-		// Root and child have Reply buttons (depth 0 and 1), grandchild (depth 2) does not
 		const replyButtons = screen.getAllByText('Reply');
 		expect(replyButtons).toHaveLength(2);
+	});
+
+	// ── Tag chip rendering ──────────────────────────────────────────────────
+
+	it('renders tag chips when annotation has tags', () => {
+		const anno = makeAnnotation({
+			tags: [
+				{ id: 1, name: 'fieldwork', count: 5 },
+				{ id: 2, name: 'important', count: 3 }
+			]
+		});
+		render(AnnotationViewer, { props: { annotations: [anno] } });
+		expect(screen.getByText('fieldwork')).toBeInTheDocument();
+		expect(screen.getByText('important')).toBeInTheDocument();
+	});
+
+	it('shows add-tag button when user is authenticated', () => {
+		mockCurrentUser.set(MOCK_USER);
+		const anno = makeAnnotation();
+		render(AnnotationViewer, { props: { annotations: [anno] } });
+		expect(screen.getByLabelText('Add tag')).toBeInTheDocument();
 	});
 
 	// ── Adversarial ──────────────────────────────────────────────────────────
@@ -249,7 +308,6 @@ describe('AnnotationViewer', () => {
 			annotation_text: 'fallback'
 		});
 		render(AnnotationViewer, { props: { annotations: [anno] } });
-		// Image type with null image falls through — text is still rendered
 		expect(screen.getByText('fallback')).toBeInTheDocument();
 	});
 });

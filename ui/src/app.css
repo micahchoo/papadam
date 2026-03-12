@@ -2,16 +2,38 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+/* ── Google Fonts ──────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@400;500;600&display=swap');
+
 /* Brand tokens — defaults match UIConfig model defaults.
    +layout.svelte overwrites these on mount once UIConfig loads. */
 :root {
 	--brand-primary: #1e3a5f;
 	--brand-accent: #3b82f6;
 	--font-scale: 1;
-	--scheme-bg: #f3f4f6;
+	--scheme-bg: #faf8f5;
+	--font-heading: 'Playfair Display', Georgia, serif;
+	--font-body: 'Inter', system-ui, sans-serif;
 	/* Scale all rem-based type with the UIConfig font_scale setting. */
 	font-size: calc(100% * var(--font-scale));
 }
+
+/* ── Newspaper typography base ─────────────────────────────────────────────── */
+body {
+	font-family: var(--font-body);
+	color: #1a1a1a;
+	background-color: var(--scheme-bg);
+}
+
+h1, h2, h3 {
+	font-family: var(--font-heading);
+	color: #1a1a1a;
+	line-height: 1.15;
+}
+
+h1 { font-size: 2rem; font-weight: 900; }
+h2 { font-size: 1.5rem; font-weight: 700; }
+h3 { font-size: 1.125rem; font-weight: 600; }
 
 /* ── High-contrast profile ─────────────────────────────────────────────────
    Activated when UIConfig.profile = 'high-contrast' or

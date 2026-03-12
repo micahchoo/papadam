@@ -10,6 +10,10 @@ export default {
 				// Tailwind can't inspect a CSS variable's channel values at build time.
 				'brand-primary': 'var(--brand-primary)',
 				'brand-accent': 'var(--brand-accent)'
+			},
+			fontFamily: {
+				heading: ['Playfair Display', 'Georgia', 'serif'],
+				body: ['Inter', 'system-ui', 'sans-serif']
 			}
 		}
 	},
