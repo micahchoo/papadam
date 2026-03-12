@@ -743,6 +743,9 @@
 									<span class="font-body text-xs uppercase tracking-wider {g.is_public ? 'text-green-700' : 'text-gray-500'}">
 										{g.is_public ? 'Public' : 'Private'}
 									</span>
+									<span class="font-body text-xs text-gray-400">
+										{g.users?.length ?? 0} members
+									</span>
 								</div>
 								{#if g.description}
 									<p class="mt-0.5 line-clamp-1 font-body text-xs text-gray-500">{g.description}</p>
@@ -808,7 +811,8 @@
 						<tr class="border-b-2 border-gray-900 text-left">
 							<th class="pb-2 pr-4 font-semibold">Type</th>
 							<th class="pb-2 pr-4 font-semibold">Status</th>
-							<th class="pb-2 font-semibold">Requested</th>
+							<th class="pb-2 pr-4 font-semibold">Requested</th>
+							<th class="pb-2 font-semibold"></th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-gray-200">
@@ -828,8 +832,15 @@
 										<span class="text-amber-600">Pending</span>
 									{/if}
 								</td>
-								<td class="py-2 text-gray-500">
+								<td class="py-2 pr-4 text-gray-500">
 									{new Date(req.requested_at).toLocaleString()}
+								</td>
+								<td class="py-2">
+									{#if req.is_complete && req.request_type === 'export' && req.requested_file}
+										<a href={req.requested_file} class="font-body text-xs text-blue-700 underline" download>
+											Download
+										</a>
+									{/if}
 								</td>
 							</tr>
 						{/each}
