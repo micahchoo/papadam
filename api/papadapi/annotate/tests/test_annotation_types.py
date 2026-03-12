@@ -100,7 +100,7 @@ def test_invalid_annotation_type_rejected(member_client, member_media):
         },
     )
     assert resp.status_code == 400
-    assert "Invalid annotation_type" in resp.data["detail"]
+    assert "annotation_type" in resp.data
 
 
 @pytest.mark.django_db
@@ -114,13 +114,13 @@ def test_empty_annotation_text_accepted(member_client, member_media):
             "annotation_text": "",
         },
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert resp.data["annotation_text"] == ""
 
 
 @pytest.mark.django_db
-def test_media_ref_with_nonexistent_uuid_stored(member_client, member_media):
-    """media_ref_uuid is a plain UUIDField — no FK validation, just stores the UUID."""
+def test_media_ref_with_nonexistent_uuid_rejected(member_client, member_media):
+    """media_ref_uuid pointing at nonexistent media is rejected by the serializer."""
     bogus_uuid = "deadbeef-dead-dead-dead-deaddeaddead"
     resp = member_client.post(
         "/api/v1/annotate/",
@@ -132,13 +132,12 @@ def test_media_ref_with_nonexistent_uuid_stored(member_client, member_media):
             "annotation_text": "cross-ref",
         },
     )
-    assert resp.status_code == 200
-    assert resp.data["media_ref_uuid"] == bogus_uuid
+    assert resp.status_code == 400
 
 
 @pytest.mark.django_db
-def test_reply_to_nonexistent_annotation_silently_ignored(member_client, member_media):
-    """View wraps reply_to lookup in contextlib.suppress — nonexistent ID is ignored."""
+def test_reply_to_nonexistent_annotation_rejected(member_client, member_media):
+    """Nonexistent reply_to PK is rejected by DRF field validation."""
     resp = member_client.post(
         "/api/v1/annotate/",
         {
@@ -148,5 +147,4 @@ def test_reply_to_nonexistent_annotation_silently_ignored(member_client, member_
             "reply_to": 999999,
         },
     )
-    assert resp.status_code == 200
-    assert resp.data["reply_to"] is None
+    assert resp.status_code == 400

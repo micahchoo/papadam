@@ -94,8 +94,7 @@ class AnnotationSerializer(serializers.ModelSerializer):
             ) from None
         request = self.context.get("request")
         if request and request.user and not request.user.is_anonymous:
-            user_groups = Group.objects.filter(users=request.user)
-            if media.group not in user_groups:
+            if not Group.objects.filter(users=request.user, pk=media.group_id).exists():
                 raise serializers.ValidationError(
                     "You do not have access to the referenced media."
                 )
