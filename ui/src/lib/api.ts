@@ -431,10 +431,10 @@ export const annotations = {
 	delete: (uuid: string) => http.delete<void>(`/api/v1/annotate/${uuid}/`),
 
 	addTag: (uuid: string, tagName: string) =>
-		http.post<Annotation>(`/api/v1/annotate/${uuid}/add_tag/`, { tag: tagName }),
+		http.put<Annotation>(`/api/v1/annotate/${uuid}/add_tag/`, { tag: tagName }),
 
 	removeTag: (uuid: string, tagName: string) =>
-		http.post<Annotation>(`/api/v1/annotate/${uuid}/remove_tag/`, { tag: tagName })
+		http.put<Annotation>(`/api/v1/annotate/${uuid}/remove_tag/`, { tag: tagName })
 };
 
 // ── Tags ──────────────────────────────────────────────────────────────────────
@@ -483,12 +483,6 @@ export const exhibits = {
 			})
 	}
 };
-
-// ── CRDT ──────────────────────────────────────────────────────────────────────
-// crdt.loadState and crdt.saveState removed — CRDT sync is handled by the
-// crdt/ Node server directly over WebSocket, not via the REST API.
-
-export const crdt = {};
 
 // ── Events / Job status ───────────────────────────────────────────────────────
 

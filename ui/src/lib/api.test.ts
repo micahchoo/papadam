@@ -295,16 +295,16 @@ describe('annotations', () => {
 		expect(mockHttp.delete).toHaveBeenCalledWith('/api/v1/annotate/anno-uuid/');
 	});
 
-	it('addTag posts to /api/v1/annotate/{uuid}/add_tag/', () => {
+	it('addTag puts to /api/v1/annotate/{uuid}/add_tag/', () => {
 		annotations.addTag('anno-uuid', 'fieldwork');
-		expect(mockHttp.post).toHaveBeenCalledWith('/api/v1/annotate/anno-uuid/add_tag/', {
+		expect(mockHttp.put).toHaveBeenCalledWith('/api/v1/annotate/anno-uuid/add_tag/', {
 			tag: 'fieldwork'
 		});
 	});
 
-	it('removeTag posts to /api/v1/annotate/{uuid}/remove_tag/', () => {
+	it('removeTag puts to /api/v1/annotate/{uuid}/remove_tag/', () => {
 		annotations.removeTag('anno-uuid', 'fieldwork');
-		expect(mockHttp.post).toHaveBeenCalledWith('/api/v1/annotate/anno-uuid/remove_tag/', {
+		expect(mockHttp.put).toHaveBeenCalledWith('/api/v1/annotate/anno-uuid/remove_tag/', {
 			tag: 'fieldwork'
 		});
 	});
