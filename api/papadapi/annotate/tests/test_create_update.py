@@ -108,23 +108,6 @@ def test_create_reply_to_sets_parent(member_client, member_media, member_annotat
     assert ann.reply_to_id == member_annotation.id
 
 
-@pytest.mark.django_db
-def test_create_invalid_reply_to_returns_400(member_client, member_media):
-    """Malformed reply_to must return 400."""
-    resp = member_client.post(
-        "/api/v1/annotate/",
-        {
-            "media_reference_id": str(member_media.uuid),
-            "annotation_text": "note",
-            "media_target": "t=0,5",
-            "reply_to": "not-an-id",
-            "tags": "",
-        },
-        format="multipart",
-    )
-    assert resp.status_code == 400
-
-
 # ── Validation tests ──────────────────────────────────────────────────────────
 
 

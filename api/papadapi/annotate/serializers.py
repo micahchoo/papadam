@@ -18,7 +18,7 @@ def compute_depth(annotation: Annotation) -> int:
     depth = 0
     current = annotation
     while current.reply_to_id is not None and depth <= MAX_REPLY_DEPTH:
-        current = Annotation.objects.select_related().get(pk=current.reply_to_id)
+        current = Annotation.objects.only("id", "reply_to_id").get(pk=current.reply_to_id)
         depth += 1
     return depth
 
