@@ -49,7 +49,7 @@
 
 	// Listen for AUTH_EXPIRED messages from the service worker
 	function handleSwMessage(event: MessageEvent) {
-		if ((event.data as Record<string, unknown>)?.type === 'AUTH_EXPIRED') {
+		if ((event.data as Record<string, unknown>)?.['type'] === 'AUTH_EXPIRED') {
 			localStorage.removeItem('access_token');
 			localStorage.removeItem('refresh_token');
 			void clearTokensFromIdb();
