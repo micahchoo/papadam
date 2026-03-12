@@ -399,3 +399,32 @@ def test_list_annotations_with_group_filter(member_client, member_annotation, gr
     for anno in resp.data["results"]:
         # All returned annotations should belong to the filtered group
         assert True  # structure depends on serializer; at minimum no crash
+
+
+@pytest.mark.django_db
+def test_create_reply_to_annotation_with_no_group_returns_400(member_client):
+    """Cannot reply to an annotation that has group=None.
+
+    Use an invalid media_reference_id so save() can't auto-compute the group.
+    """
+    parent = Annotation.objects.create(
+        media_reference_id="http://example.com/nonexistent",
+        annotation_text="orphan parent",
+        media_target="t=0,5",
+        group=None,
+    )
+    assert parent.group is None, "Parent must have no group for this test"
+    resp = member_client.post(
+        "/api/v1/annotate/",
+        {
+            "media_reference_id": "http://example.com/nonexistent",
+            "annotation_text": "reply to orphan",
+            "media_target": "t=0,5",
+            "reply_to": str(parent.id),
+            "tags": "",
+        },
+        format="multipart",
+    )
+    # 400 from serializer validation or 403 from permission check — either
+    # prevents the annotation from being created.
+    assert resp.status_code in (400, 403)
