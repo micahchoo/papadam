@@ -3,10 +3,11 @@ seed_prod — idempotent production data seed.
 
 Creates (from environment variables):
   • Admin user — ADMIN_USERNAME (default "admin"), ADMIN_PASSWORD (required)
-  • "Instance" group — admin as member
-  • UIConfig on that group with defaults
+  • Group — SEED_GROUP_NAME (default "Community"), admin as member
+  • UIConfig — SEED_GROUP_LANGUAGE, SEED_BRAND_NAME, SEED_BRAND_PRIMARY,
+    SEED_BRAND_ACCENT (all with sensible defaults)
 
-Re-running is safe — uses get_or_create throughout.
+Re-running is safe — uses get_or_create / update_or_create throughout.
 The admin password is NOT reset if the user already exists (intentional).
 """
 
@@ -24,7 +25,7 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = "Seed production data (admin user, Instance group, UIConfig)"
+    help = "Seed production data (admin user, group, UIConfig from SEED_ env vars)"
 
     def handle(self, *args: object, **options: object) -> None:
         admin_username = os.environ.get("ADMIN_USERNAME", "admin")
@@ -63,24 +64,36 @@ class Command(BaseCommand):
             )
 
         # ── Instance group ────────────────────────────────────────────────────
+        group_name = os.environ.get("SEED_GROUP_NAME", "Community")
         group, created = Group.objects.get_or_create(
-            name="Instance",
+            name=group_name,
             defaults={"is_public": False, "is_active": True},
         )
         if created:
-            logger.info("created_group", name="Instance")
-            self.stdout.write("  created group 'Instance'")
+            logger.info("created_group", name=group_name)
+            self.stdout.write(f"  created group '{group_name}'")
         else:
-            self.stdout.write("  skip group 'Instance' (already exists)")
+            self.stdout.write(f"  skip group '{group_name}' (already exists)")
 
         group.users.add(admin)
 
         # ── UIConfig ──────────────────────────────────────────────────────────
-        _, created = UIConfig.objects.get_or_create(group=group)
+        # Group post_save signal auto-creates UIConfig with model defaults.
+        # Use update_or_create to apply SEED_ overrides regardless.
+        _, created = UIConfig.objects.update_or_create(
+            group=group,
+            defaults={
+                "language": os.environ.get("SEED_GROUP_LANGUAGE", "en"),
+                "brand_name": os.environ.get("SEED_BRAND_NAME", group_name),
+                "primary_color": os.environ.get("SEED_BRAND_PRIMARY", "#1e3a5f"),
+                "accent_color": os.environ.get("SEED_BRAND_ACCENT", "#d97706"),
+            },
+        )
         if created:
-            logger.info("created_uiconfig", group="Instance")
-            self.stdout.write("  created UIConfig for Instance group")
+            logger.info("created_uiconfig", group=group_name)
+            self.stdout.write(f"  created UIConfig for {group_name} group")
         else:
-            self.stdout.write("  skip UIConfig (already exists)")
+            logger.info("updated_uiconfig", group=group_name)
+            self.stdout.write(f"  updated UIConfig for {group_name} group")
 
         self.stdout.write(self.style.SUCCESS("seed_prod complete."))
