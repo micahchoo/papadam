@@ -1,0 +1,269 @@
+# papadam — Portainer deployment stack (pulls pre-built images from ghcr.io)
+#
+# All application images are pulled from ghcr.io — no local builds needed.
+#
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │  HOW TO DEPLOY WITH PORTAINER                                      │
+# │                                                                     │
+# │  1. In Portainer → Registries → Add registry                       │
+# │     • Type: Custom                                                  │
+# │     • URL: ghcr.io                                                  │
+# │     • Username: micahchoo                                           │
+# │     • Password: your GitHub PAT (needs read:packages scope)         │
+# │                                                                     │
+# │  2. Stacks → Add stack                                             │
+# │     • Option A: "Repository" — point to this GitHub repo,          │
+# │       path = deploy/docker-compose.portainer.yml                    │
+# │     • Option B: "Upload" — upload this file                        │
+# │     • Option C: "Web editor" — paste this file's contents          │
+# │                                                                     │
+# │  3. Set environment variables (below the editor):                   │
+# │     • POSTGRES_PASSWORD  (required)                                 │
+# │     • MINIO_ROOT_USER    (required if using minio profile)          │
+# │     • MINIO_ROOT_PASSWORD (required if using minio profile)         │
+# │     • IMAGE_TAG          (optional, defaults to "latest")           │
+# │     • DOMAIN             (required if using webserver profile)      │
+# │                                                                     │
+# │  4. Deploy the stack                                                │
+# │                                                                     │
+# │  To update: Stacks → your stack → "Pull and redeploy"              │
+# └─────────────────────────────────────────────────────────────────────┘
+#
+# Profiles (enable in Portainer's stack config or via CLI):
+#   (none)         — postgres, redis, api, bg-app, crdt, ui
+#   webserver      — caddy (automatic HTTPS reverse proxy)
+#   minio          — MinIO object storage + auto bucket init
+#   transcribe     — Whisper transcription worker
+#   docs           — MkDocs documentation site
+#   backup         — automated daily PostgreSQL backups
+
+# ── NOTE: env_file ────────────────────────────────────────────────────
+# All services reference service_config.env for runtime settings.
+# Copy service_config.env.sample → service_config.env and fill in values.
+#
+# If deploying via Portainer "Repository" mode, place service_config.env
+# on the Portainer host at the stack's working directory before deploying.
+# Alternatively, use Portainer "Web editor" mode and set all variables
+# via Portainer's "Environment variables" section (remove env_file lines).
+
+x-api-base: &api-base
+  image: ghcr.io/micahchoo/papadam/api:${IMAGE_TAG:-latest}
+  env_file: service_config.env
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+
+  # ── Data ────────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: papadam
+      POSTGRES_USER: papadam
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "papadam"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z
+    profiles: [minio]
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || wget -qO- http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2024-11-17T19-35-25Z
+    profiles: [minio]
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+        mc mb --ignore-existing local/papadam &&
+        mc anonymous set public local/papadam &&
+        echo bucket_ready
+      "
+    env_file: service_config.env
+
+  # ── Application ─────────────────────────────────────────────────────────
+
+  api:
+    <<: *api-base
+    container_name: papadam-api
+    restart: unless-stopped
+    command: bash startup.sh
+    networks:
+      - default
+      - nginx_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  bg-app:
+    <<: *api-base
+    restart: unless-stopped
+    command: python -m arq papadapi.worker.WorkerSettings
+    healthcheck:
+      test: ["CMD", "python", "-c", "import arq; print('ok')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  crdt:
+    image: ghcr.io/micahchoo/papadam/crdt:${IMAGE_TAG:-latest}
+    container_name: papadam-crdt
+    restart: unless-stopped
+    env_file: service_config.env
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+      - nginx_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:1234/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ui:
+    image: ghcr.io/micahchoo/papadam/ui:${IMAGE_TAG:-latest}
+    container_name: papadam-ui
+    restart: unless-stopped
+    networks:
+      - default
+      - nginx_network
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Optional profiles ──────────────────────────────────────────────────
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: [webserver]
+    restart: unless-stopped
+    env_file: service_config.env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile.portainer:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      crdt:
+        condition: service_healthy
+      ui:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  transcribe:
+    image: ghcr.io/micahchoo/papadam/transcribe:${IMAGE_TAG:-latest}
+    profiles: [transcribe]
+    restart: unless-stopped
+    env_file: service_config.env
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import arq, whisper; print('ok')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  docs:
+    image: ghcr.io/micahchoo/papadam/docs:${IMAGE_TAG:-latest}
+    profiles: [docs]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/ || wget -qO- http://localhost:8001/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backup:
+    image: prodrigestivill/postgres-backup-local:16
+    profiles: [backup]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: papadam
+      POSTGRES_USER: papadam
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    volumes:
+      - ./backups:/backups
+
+volumes:
+  pg-data:
+  redis-data:
+  minio-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  default:
+  nginx_network:

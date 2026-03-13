@@ -1,0 +1,39 @@
+{$DOMAIN} {
+    # API + auth + admin
+    reverse_proxy /api/*    api:8000
+    reverse_proxy /auth/*   api:8000
+    reverse_proxy /nimda/*  api:8000
+    reverse_proxy /static/* api:8000
+    reverse_proxy /schema/* api:8000
+
+    # CRDT WebSocket
+    reverse_proxy /ws/*     crdt:1234
+
+    # MinIO (if minio profile active)
+    reverse_proxy /minio/*  minio:9000
+
+    # Docs (if docs profile active)
+    reverse_proxy /docs/*   docs:8001
+
+    # Runtime config — fetched by SvelteKit SPA on startup
+    reverse_proxy /config.json  api:8000
+    reverse_proxy /healthcheck/ api:8000
+
+    # SvelteKit SPA — served by the ui container (nginx)
+    reverse_proxy ui:80
+
+    encode gzip
+
+    request_body {
+        max_size 500MB
+    }
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Content-Security-Policy "default-src 'self' http: https: ws: wss: data: blob: 'unsafe-inline'"
+        Permissions-Policy "interest-cohort=()"
+    }
+}
