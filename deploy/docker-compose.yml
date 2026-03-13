@@ -11,7 +11,9 @@
 #   docker compose --profile webserver --profile minio up -d
 
 x-api-base: &api-base
-  build: ../api
+  build:
+    context: ../api
+    target: api
   env_file: service_config.env
   depends_on:
     postgres:
@@ -67,8 +69,6 @@ services:
       retries: 12
       start_period: 15s
 
-  # Automatically creates the 'papadam' bucket with public read policy.
-  # Replaces the manual MinIO console step from papad-docker.
   minio-init:
     image: quay.io/minio/mc:RELEASE.2024-11-17T19-35-25Z
     profiles: [minio]
@@ -103,6 +103,9 @@ services:
 
   bg-app:
     <<: *api-base
+    build:
+      context: ../api
+      target: bgapps
     restart: unless-stopped
     command: python -m arq papadapi.worker.WorkerSettings
     healthcheck:

@@ -38,8 +38,9 @@ fi
 # ── Build and push ───────────────────────────────────────────────────────
 TAG="${1:-$(git -C "${ROOT}" rev-parse --short HEAD)}"
 
+# Format: "name:context[:target]"
 images=(
-  "api:${ROOT}/api"
+  "api:${ROOT}/api:api"
   "ui:${ROOT}/ui"
   "crdt:${ROOT}/crdt"
   "docs:${ROOT}/docs"
@@ -48,22 +49,51 @@ images=(
 
 echo "==> Building and pushing with tag: ${TAG}"
 
+pids=()
+logs=()
+
 for entry in "${images[@]}"; do
-  name="${entry%%:*}"
-  context="${entry#*:}"
+  IFS=: read -r name context target <<< "${entry}"
   image="${REGISTRY}/${name}:${TAG}"
+  logfile="/tmp/papadam-build-${name}.log"
 
-  echo ""
-  echo "--- ${name} ---"
-  docker build -t "${image}" "${context}"
-  docker push "${image}"
+  (
+    echo "--- ${name} ---"
+    if [[ -n "${target}" ]]; then
+      docker build --target "${target}" -t "${image}" "${context}"
+    else
+      docker build -t "${image}" "${context}"
+    fi
+    docker push "${image}"
 
-  # Always keep latest in sync
-  if [[ "${TAG}" != "latest" ]]; then
-    docker tag "${image}" "${REGISTRY}/${name}:latest"
-    docker push "${REGISTRY}/${name}:latest"
+    if [[ "${TAG}" != "latest" ]]; then
+      docker tag "${image}" "${REGISTRY}/${name}:latest"
+      docker push "${REGISTRY}/${name}:latest"
+    fi
+    echo "--- ${name} done ---"
+  ) > "${logfile}" 2>&1 &
+
+  pids+=($!)
+  logs+=("${name}:${logfile}")
+done
+
+# Wait for all builds and report results
+failed=0
+for i in "${!pids[@]}"; do
+  IFS=: read -r name logfile <<< "${logs[$i]}"
+  if wait "${pids[$i]}"; then
+    echo "  ✓ ${name}"
+  else
+    echo "  ✗ ${name} — see ${logfile}"
+    failed=1
   fi
 done
+
+if [[ "${failed}" -eq 1 ]]; then
+  echo ""
+  echo "==> Some builds failed. Check logs above."
+  exit 1
+fi
 
 echo ""
 echo "==> Done. All images pushed to ${REGISTRY} with tag ${TAG}"
