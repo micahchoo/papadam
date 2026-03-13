@@ -4,7 +4,6 @@
 #   (none)         — postgres, redis, api, bg-app, crdt
 #   webserver      — caddy (automatic HTTPS + SPA serving)
 #   minio          — MinIO object storage + auto bucket init
-#   transcribe     — Whisper transcription worker
 #   docs           — MkDocs documentation site
 #   backup         — automated daily PostgreSQL backups
 #
@@ -176,25 +175,22 @@ services:
       timeout: 5s
       retries: 3
 
-  transcribe:
-    build: ../transcribe
-    profiles: [transcribe]
-    restart: unless-stopped
-    env_file: service_config.env
-    depends_on:
-      api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-    healthcheck:
-      test: ["CMD", "python", "-c", "import arq, whisper; print('ok')"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
+  # transcribe is dormant — openai-whisper has broken builds.
+  # Uncomment when a working whisper package is available.
+  # transcribe:
+  #   build: ../transcribe
+  #   profiles: [transcribe]
+  #   restart: unless-stopped
+  #   env_file: service_config.env
+  #   depends_on:
+  #     api:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 2G
 
   docs:
     build: ../docs

@@ -5,17 +5,19 @@
 # ┌─────────────────────────────────────────────────────────────────────┐
 # │  HOW TO DEPLOY WITH PORTAINER                                      │
 # │                                                                     │
-# │  1. In Portainer → Registries → Add registry                       │
-# │     • Type: Custom                                                  │
-# │     • URL: ghcr.io                                                  │
-# │     • Username: micahchoo                                           │
-# │     • Password: your GitHub PAT (needs read:packages scope)         │
+# │  All images are public — no registry credentials needed.            │
 # │                                                                     │
-# │  2. Stacks → Add stack                                             │
+# │  1. Stacks → Add stack                                             │
 # │     • Option A: "Repository" — point to this GitHub repo,          │
 # │       path = deploy/docker-compose.portainer.yml                    │
 # │     • Option B: "Upload" — upload this file                        │
 # │     • Option C: "Web editor" — paste this file's contents          │
+# │                                                                     │
+# │  2. Upload service_config.env                                       │
+# │     • Copy service_config.env.sample, fill in your values           │
+# │     • Place it in the stack's working directory on the host,        │
+# │       or use Portainer's "Environment variables" section            │
+# │       and remove the env_file lines from this file                  │
 # │                                                                     │
 # │  3. Set environment variables (below the editor):                   │
 # │     • POSTGRES_PASSWORD  (required)                                 │
@@ -33,7 +35,6 @@
 #   (none)         — postgres, redis, api, bg-app, crdt, ui
 #   webserver      — caddy (automatic HTTPS reverse proxy)
 #   minio          — MinIO object storage + auto bucket init
-#   transcribe     — Whisper transcription worker
 #   docs           — MkDocs documentation site
 #   backup         — automated daily PostgreSQL backups
 
@@ -208,25 +209,22 @@ services:
       timeout: 5s
       retries: 3
 
-  transcribe:
-    image: ghcr.io/micahchoo/papadam/transcribe:${IMAGE_TAG:-latest}
-    profiles: [transcribe]
-    restart: unless-stopped
-    env_file: service_config.env
-    depends_on:
-      api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-    healthcheck:
-      test: ["CMD", "python", "-c", "import arq, whisper; print('ok')"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
+  # transcribe is dormant — openai-whisper has broken builds.
+  # Uncomment when a working whisper package is available.
+  # transcribe:
+  #   image: ghcr.io/micahchoo/papadam/transcribe:${IMAGE_TAG:-latest}
+  #   profiles: [transcribe]
+  #   restart: unless-stopped
+  #   env_file: service_config.env
+  #   depends_on:
+  #     api:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 2G
 
   docs:
     image: ghcr.io/micahchoo/papadam/docs:${IMAGE_TAG:-latest}

@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Build and push all service images to GitHub Container Registry.
 #
-# One-time setup:
+# One-time setup (for the developer pushing images):
 #   1. Create a GitHub PAT with "write:packages" scope
 #   2. echo $GITHUB_PAT | docker login ghcr.io -u micahchoo --password-stdin
 #   3. Install as post-commit hook:  ./deploy/build-push.sh --install-hook
+#
+# Pulling does NOT require credentials — all packages are public.
 #
 # Usage:
 #   ./deploy/build-push.sh              # uses git short SHA as tag
@@ -40,8 +42,8 @@ images=(
   "api:${ROOT}/api"
   "ui:${ROOT}/ui"
   "crdt:${ROOT}/crdt"
-  "transcribe:${ROOT}/transcribe"
   "docs:${ROOT}/docs"
+  # "transcribe:${ROOT}/transcribe"  # dormant — openai-whisper build is broken
 )
 
 echo "==> Building and pushing with tag: ${TAG}"
