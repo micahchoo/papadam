@@ -18,7 +18,9 @@ def compute_depth(annotation: Annotation) -> int:
     depth = 0
     current = annotation
     while current.reply_to_id is not None and depth <= MAX_REPLY_DEPTH:
-        current = Annotation.objects.only("id", "reply_to_id").get(pk=current.reply_to_id)
+        current = Annotation.objects.only("id", "reply_to_id").get(
+            pk=current.reply_to_id,
+        )
         depth += 1
     return depth
 
@@ -98,11 +100,15 @@ class AnnotationSerializer(serializers.ModelSerializer):
                 "Referenced media does not exist."
             ) from None
         request = self.context.get("request")
-        if request and request.user and not request.user.is_anonymous:
-            if not Group.objects.filter(users=request.user, pk=media.group_id).exists():
-                raise serializers.ValidationError(
-                    "You do not have access to the referenced media."
-                )
+        if (
+            request
+            and request.user
+            and not request.user.is_anonymous
+            and not Group.objects.filter(users=request.user, pk=media.group_id).exists()
+        ):
+            raise serializers.ValidationError(
+                "You do not have access to the referenced media."
+            )
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
