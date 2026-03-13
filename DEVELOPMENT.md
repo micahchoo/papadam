@@ -51,8 +51,18 @@ ADMIN_PASSWORD=<secret> make seed-prod
 ADMIN_USERNAME=myuser ADMIN_PASSWORD=<secret> make seed-prod
 ```
 
-Creates an admin superuser and an **Instance** group with a default UIConfig.
+Creates an admin superuser and a **Community** group with a default UIConfig.
 The password is **not** reset if the user already exists (re-runs are safe).
+
+Optional `SEED_` env vars customise the initial group:
+
+| Variable | Default | Description |
+|---|---|---|
+| `SEED_GROUP_NAME` | `Community` | Group name |
+| `SEED_GROUP_LANGUAGE` | `en` | BCP 47 language tag |
+| `SEED_BRAND_NAME` | same as group name | Shown in masthead |
+| `SEED_BRAND_PRIMARY` | `#1e3a5f` | Primary brand colour |
+| `SEED_BRAND_ACCENT` | `#d97706` | Accent colour |
 
 ---
 

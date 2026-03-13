@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -59,7 +60,7 @@ class Annotation(models.Model):
         VIDEO = "video", _("Video")
         MEDIA_REF = "media_ref", _("Media Reference")
 
-    media_reference_id = models.URLField(_("Media Reference URL"), max_length=500)
+    media_reference_id = models.CharField(_("Media Reference ID"), max_length=500)
     media_target = models.CharField(
         _("Media Target(Time start and end)"), max_length=100
     )
@@ -149,14 +150,13 @@ class Annotation(models.Model):
 
         resp_data: list[dict[str, Any]] = []
         resp: dict[str, Any] = {}  # This is the final response
+
+        # Load the reference annotation structure template once
+        with open("./papadapi/annotate/annotation_structure.json") as f:
+            ref_json: dict[str, Any] = json.loads(f.read())
+
         for d in data:
-            ref_json: dict[str, Any] = {}  # Referece json
-
-            # Load the reference annotation structure template
-            with open("./papadapi/annotate/annotation_structure.json") as f:
-                ref_json = json.loads(f.read())
-
-            a_struct = ref_json
+            a_struct = copy.deepcopy(ref_json)
             a_struct["id"] = d.uuid
             a_struct["created"] = d.created_at
             a_struct["modified"] = d.updated_at

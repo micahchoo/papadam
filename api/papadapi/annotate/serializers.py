@@ -127,8 +127,3 @@ class AnnotationSerializer(serializers.ModelSerializer):
                     {"reply_to": "Reply must be to an annotation in the same group."}
                 )
         return attrs
-
-
-class AnnotationStatsSerializer(serializers.Serializer):
-    created_date = serializers.DateField()
-    total = serializers.IntegerField()

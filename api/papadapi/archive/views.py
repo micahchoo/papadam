@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from django.conf import settings
 from django.core.files.storage import default_storage
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
@@ -25,88 +23,59 @@ from papadapi.archive.permissions import (
     IsArchiveUpdateOrReadOnly,
 )
 from papadapi.archive.signals import media_copied
-from papadapi.common.functions import create_or_update_tag, recalculate_tag_count
-from papadapi.common.models import Group, Question, Tags
-from papadapi.common.serializers import CustomPageNumberPagination
+from papadapi.common.authentication import InternalServiceKeyAuthentication
+from papadapi.common.functions import (
+    build_extra_group_response,
+    build_group_filter,
+    create_or_update_tag,
+    is_truthy,
+)
+from papadapi.common.mixins import TagAddMixin, TagRemoveMixin
+from papadapi.common.models import Group
+from papadapi.common.serializers import (
+    CustomPageNumberPagination,
+)
+from papadapi.common.serializers import (
+    DailyStatsSerializer as MediaStatsSerializer,
+)
 from papadapi.queue import enqueue_after
 from papadapi.users.permissions import IsSuperUser
 
 from .models import MediaStore
-from .serializers import MediaStatsSerializer, MediaStoreSerializer
+from .serializers import MediaStoreSerializer
 
 log = structlog.get_logger(__name__)
 
 class MediaStoreRemoveTag(
-    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
+    TagRemoveMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
 ):
-
-    """
-    Remove Tag from a media
-    """
+    """Remove Tag from a media."""
 
     queryset = MediaStore.objects.all()
     serializer_class = MediaStoreSerializer
     permission_classes = [IsArchiveUpdateOrReadOnly]
-
+    pagination_class = CustomPageNumberPagination
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
-    pagination_class = CustomPageNumberPagination
 
-    def get_object(self) -> MediaStore:
-        obj = super().get_object()
-        # perform some extra checks on obj, e.g custom permissions
-        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        data = request.data
-
-        obj = self.get_object()
-        m = MediaStore.objects.get(uuid=obj.uuid)
-
-        tags = data.get("tags")
-        if tags:
-            for tag_id in tags:
-                t = Tags.objects.get(id=tag_id)
-                m.tags.remove(t)
-                recalculate_tag_count(t)
-        serializer = MediaStoreSerializer(m)
-        return Response(serializer.data)
 
 class MediaStoreAddTag(
-    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
+    TagAddMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
 ):
-
-    """
-    Add Tag from a media
-    """
+    """Add Tag to a media."""
 
     queryset = MediaStore.objects.all()
     serializer_class = MediaStoreSerializer
     permission_classes = [IsArchiveUpdateOrReadOnly]
-
+    pagination_class = CustomPageNumberPagination
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
-    pagination_class = CustomPageNumberPagination
-
-    def get_object(self) -> MediaStore:
-        obj = super().get_object()
-        # perform some extra checks on obj, e.g custom permissions
-        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        data = request.data
-
-        obj = self.get_object()
-        m = MediaStore.objects.get(uuid=obj.uuid)
-
-        tags = data.get("tags")
-        if tags:
-            for tag in tags:
-                tag_obj = create_or_update_tag(tag)
-                if tag_obj:
-                    m.tags.add(tag_obj)
-        serializer = MediaStoreSerializer(m)
-        return Response(serializer.data)
 
 class MediaStoreUpdateSet(
     mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
@@ -124,23 +93,15 @@ class MediaStoreUpdateSet(
     lookup_url_kwarg = "uuid"
     pagination_class = CustomPageNumberPagination
 
-    def get_object(self) -> MediaStore:
-        obj = super().get_object()
-        # perform some extra checks on obj, e.g custom permissions
-        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
-
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
+        m = self.get_object()
 
-        obj = self.get_object()
-        m = MediaStore.objects.get(uuid=obj.uuid)
-
-        name = data.get("name", m.name)
-        description = data.get("description", m.description)
-        extra_group_response = data.get("extra_group_response", m.extra_group_response)
-        m.name = name
-        m.description = description
-        m.extra_group_response = extra_group_response
+        m.name = data.get("name", m.name)
+        m.description = data.get("description", m.description)
+        m.extra_group_response = data.get(
+            "extra_group_response", m.extra_group_response
+        )
         m.save()
         serializer = MediaStoreSerializer(m)
         return Response(serializer.data)
@@ -151,17 +112,15 @@ class MediaStoreUpdateSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_destroy(self, instance: MediaStore) -> None:
-        obj = self.get_object()
-        m = MediaStore.objects.get(id=obj.id)
-        m.is_delete = True
-        m.save()
-        if m.group.delete_wait_for == 0:
-            enqueue_after("delete_media_post_schedule", m.id, delay=10)
+        instance.is_delete = True
+        instance.save()
+        if instance.group.delete_wait_for == 0:
+            enqueue_after("delete_media_post_schedule", instance.id, delay=10)
         else:
             enqueue_after(
                 "delete_media_post_schedule",
-                m.id,
-                delay=timedelta(days=m.group.delete_wait_for),
+                instance.id,
+                delay=timedelta(days=instance.group.delete_wait_for),
             )
 
 class MediaStoreUploadFileView(
@@ -181,15 +140,13 @@ class MediaStoreUploadFileView(
     lookup_url_kwarg = "uuid"
 
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        my_file=request.FILES.get('upload')
+        my_file = request.FILES.get('upload')
+        media = self.get_object()
 
-        obj = self.get_object()
-        media = MediaStore.objects.get(uuid=obj.uuid)
-
-        media.upload=my_file
-        media.orig_name=my_file.name
-        media.file_extension=my_file.content_type
-        media.orig_size=my_file.size
+        media.upload = my_file
+        media.orig_name = my_file.name
+        media.file_extension = my_file.content_type
+        media.orig_size = my_file.size
         media.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -212,8 +169,6 @@ class MediaStoreCreateSet(
         search_where = self.request.GET.get("searchWhere",None)
         search_from = self.request.GET.get("searchFrom",None)
         search_collections = self.request.GET.get("searchCollections",None)
-        final_query = None
-        group_query = None
 
         # By default search in name and description unless overridden
         if search_query and not search_where:
@@ -229,40 +184,9 @@ class MediaStoreCreateSet(
             elif search_where == "tags":
                 query = Q(tags__name__in=search_query)
 
-        # search_from
-        # Is anonymouus or non-logged in user :
-        public_q = Q(group__in=Group.objects.filter(is_public=True, is_active=True))
-        if self.request.user.is_anonymous:
-            group_query = public_q
-            if search_from in ("all_collections", "public"):
-                group_query = public_q
-            elif (
-                search_from == "selected_collections"
-                and search_collections is not None
-            ):
-                group_list = search_collections.split(",")
-                group_query = Q(group__in=Group.objects.filter(id__in=group_list))
-            else:
-                pass
-        else:
-            if search_from == "all_collections":
-                group_query = public_q | Q(
-                    group__in=Group.objects.filter(users__in=[self.request.user])
-                )
-            if search_from == "my_collections":
-                group_query = Q(
-                    group__in=Group.objects.filter(users__in=[self.request.user])
-                )
-            elif search_from == "public":
-                group_query = public_q
-            elif (
-                search_from == "selected_collections"
-                and search_collections is not None
-            ):
-                group_list = search_collections.split(",")
-                group_query = Q(group__in=Group.objects.filter(id__in=group_list))
-            else:
-                pass
+        group_query = build_group_filter(
+            self.request.user, search_from, search_collections,
+        )
 
         if query and group_query:
             final_query = query & group_query
@@ -301,26 +225,9 @@ class MediaStoreCreateSet(
                 )
             name = data["name"]
             description = data["description"]
-            extra_group_response = (
-                json.loads(data["extra_group_response"])
-                if "extra_group_response" in data
-                else []
+            group_extra_response = build_extra_group_response(
+                data.get("extra_group_response", "[]")
             )
-            group_extra_response: list[dict[str, Any]] = []
-            if extra_group_response and len(extra_group_response["answers"]) > 0:
-                for answer in extra_group_response["answers"]:
-                    q = answer["question_id"]
-                    question = Question.objects.get(id=q)
-                    if question:
-                        group_extra_response.append(
-                            {
-                                "question_id": q,
-                                "question": question.question,
-                                "question_type": question.question_type,
-                                "question_mandatory": question.question_mandatory,
-                                "response": answer["response"],
-                            }
-                        )
 
             group_instance = Group.objects.get(id=group)
             try:
@@ -353,7 +260,9 @@ class MediaStoreCreateSet(
                         "convert_to_hls_audio", m.id, "/tmp/upload/", delay=10
                     )
                 else:
-                    m.media_processing_status = "Media unknown"
+                    m.media_processing_status = (
+                        MediaStore.ProcessingStatus.MEDIA_UNKNOWN
+                    )
                     m.save()
 
                 serializer = MediaStoreSerializer(m)
@@ -390,41 +299,24 @@ class MediaStoreCopySet(
         data = request.data
         obj_uuid = self.kwargs["uuid"]
         group_to = Group.objects.get(id=data["to_group"])
-        extra_group_response = (
-            json.loads(data["extra_group_response"])
-            if "extra_group_response" in data
-            else {}
+        group_extra_response = build_extra_group_response(
+            data.get("extra_group_response", "{}")
         )
-        group_extra_response: list[dict[str, Any]] = []
-        if extra_group_response and len(extra_group_response["answers"]) > 0:
-            for answer in extra_group_response["answers"]:
-                q = answer["question_id"]
-                question = Question.objects.get(id=q)
-                if question:
-                    group_extra_response.append(
-                        {
-                            "question_id": q,
-                            "question": question.question,
-                            "question_type": question.question_type,
-                            "question_mandatory": question.question_mandatory,
-                            "response": answer["response"],
-                        }
-                    )
 
         old_media = MediaStore.objects.get(uuid=obj_uuid)
-        m = MediaStore.objects.get(uuid=obj_uuid)
+        m = MediaStore.objects.get(uuid=obj_uuid)  # clone source — pk nulled below
         m.pk = None
         m._state.adding = True
         m.group = group_to
         m.extra_group_response = group_extra_response
         m.uuid = uuid.uuid4()
         m.save()
-        if "copy_tags" in data and data["copy_tags"] == "True":
+        if is_truthy(data.get("copy_tags", False)):
             for tag in old_media.tags.all():
                 tag_obj = create_or_update_tag(tag.name)
                 if tag_obj:
                     m.tags.add(tag_obj)
-        if "copy_annotations" in data and data["copy_annotations"] == "True":
+        if is_truthy(data.get("copy_annotations", False)):
             media_copied.send(
                 sender=self.__class__,
                 old_uuid=str(obj_uuid),
@@ -489,14 +381,9 @@ class MediaStoreTranscriptView(APIView):
     """
 
     permission_classes = [AllowAny]
-    authentication_classes: list[type[Any]] = []  # no JWT — key-based auth only
+    authentication_classes = [InternalServiceKeyAuthentication]
 
     def post(self, request: Request, uuid: str) -> Response:
-        expected: str = getattr(settings, "INTERNAL_SERVICE_KEY", "")
-        key: str = request.headers.get("X-Internal-Key", "")
-        if not expected or key != expected:
-            return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
-
         vtt_file = request.FILES.get("vtt")
         if not vtt_file:
             return Response(

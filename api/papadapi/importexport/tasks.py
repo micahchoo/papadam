@@ -21,7 +21,8 @@ from django.core.files import File
 
 from papadapi.annotate.models import Annotation
 from papadapi.archive.models import MediaStore
-from papadapi.common.models import Group, Tags
+from papadapi.common.functions import create_or_update_tag
+from papadapi.common.models import Group
 from papadapi.importexport.models import IERequest
 
 log = structlog.get_logger(__name__)
@@ -33,7 +34,7 @@ log = structlog.get_logger(__name__)
 def download(url: str, file_name: str, files_path: str) -> str:
     file_name = file_name.split("/")[1]
     with open(os.path.join(files_path, file_name), "wb") as file:
-        response = requests.get(url)  # noqa: S113
+        response = requests.get(url, timeout=120)
         file.write(response.content)
     return file_name
 
@@ -137,10 +138,9 @@ def import_media(files_path: str, media_data: dict[str, Any], group: Group) -> b
             upload=File(file=f),
         )
     for tag in media_data["tags"].split(","):
-        tag_obj = Tags.objects.filter(name=tag).first()
-        if not tag_obj:
-            tag_obj = Tags.objects.create(name=tag)
-        media.tags.add(tag_obj)
+        tag_obj = create_or_update_tag(tag)
+        if tag_obj:
+            media.tags.add(tag_obj)
     if "annotations" in media_data:
         for annovals in media_data["annotations"].values():
             import_annotation(files_path, annovals, media)
@@ -154,7 +154,7 @@ def extract_json_for_import(
     tarfilename = download(import_data.url, import_data.name, files_path)  # type: ignore[attr-defined]
     if tarfile.is_tarfile(tarfilename):
         with tarfile.open(tarfilename, "r") as file_obj:
-            file_obj.extractall()  # noqa: S202
+            file_obj.extractall(filter="data")
         with open("data.json") as f:
             jsondata = json.load(f)
         return jsondata or None

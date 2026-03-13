@@ -34,34 +34,28 @@ def upload_to(instance: MediaStore, filename: str) -> str:
 
 class MediaStore(models.Model):
 
-    media_processing_choices = (
-        ("Yet to process", " Media processing yet to start"),
-        ("Video identified", "Media identified as Video"),
-        ("Audio identified", "Media identified as Audio"),
-        (
-            "Processing started",
-            "Media processing started. This will take a long time.",
-        ),
-        (
-            "Processing completed",
-            "Media processing completed. Stream will be available soon",
-        ),
-        (
-            "Processing error",
-            "Media processing error. Notify admin to take a look at this",
-        ),
-        (
-            "Media unknown",
+    class ProcessingStatus(models.TextChoices):
+        YET_TO_PROCESS = "Yet to process", _("Media processing yet to start")
+        VIDEO_IDENTIFIED = "Video identified", _("Media identified as Video")
+        AUDIO_IDENTIFIED = "Audio identified", _("Media identified as Audio")
+        PROCESSING_STARTED = "Processing started", _(
+            "Media processing started. This will take a long time."
+        )
+        PROCESSING_COMPLETED = "Processing completed", _(
+            "Media processing completed. Stream will be available soon"
+        )
+        PROCESSING_ERROR = "Processing error", _(
+            "Media processing error. Notify admin to take a look at this"
+        )
+        MEDIA_UNKNOWN = "Media unknown", _(
             "The uploaded media is not recognized as audio/video. "
-            "Notify admin if you think this is a mistake",
-        ),
-        ("Stream uploading", "Media streams have started uploading"),
-        ("Stream completed", "Media streams upload completed"),
-        (
-            "Stream upload error",
-            "Media streams upload error. Notify admin to take a look at this",
-        ),
-    )
+            "Notify admin if you think this is a mistake"
+        )
+        STREAM_UPLOADING = "Stream uploading", _("Media streams have started uploading")
+        STREAM_COMPLETED = "Stream completed", _("Media streams upload completed")
+        STREAM_UPLOAD_ERROR = "Stream upload error", _(
+            "Media streams upload error. Notify admin to take a look at this"
+        )
 
     upload = models.FileField(
         _("Uploaded Archive"),
@@ -106,8 +100,8 @@ class MediaStore(models.Model):
     media_processing_status = models.CharField(
         _("Media processing status"),
         max_length=100,
-        default="Yet to process",
-        choices=media_processing_choices,
+        default=ProcessingStatus.YET_TO_PROCESS,
+        choices=ProcessingStatus.choices,
     )
     transcript_vtt_url = models.URLField(
         _("Transcript VTT URL"),

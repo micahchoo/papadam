@@ -1,5 +1,5 @@
-import '@testing-library/svelte/vitest';
 import '@testing-library/jest-dom/vitest';
+import '@testing-library/svelte/vitest';
 import { vi } from 'vitest';
 
 // Mock Y.js IndexedDB provider — don't touch real browser storage in unit tests

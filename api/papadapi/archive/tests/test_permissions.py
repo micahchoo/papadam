@@ -19,7 +19,8 @@ def _drf_request(wsgi_request):
     """Wrap a WSGI request in DRF's Request so .data and .query_params work."""
     from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
-    drf_req = Request(wsgi_request, parsers=[JSONParser(), FormParser(), MultiPartParser()])
+    parsers = [JSONParser(), FormParser(), MultiPartParser()]
+    drf_req = Request(wsgi_request, parsers=parsers)
     # Preserve the user we set on the WSGI request
     drf_req._user = wsgi_request.user
     return drf_req
@@ -105,8 +106,6 @@ class TestIsArchiveCreateOrReadOnly:
         raw = self.factory.get("/api/v1/archive/", {"group": ""})
         raw.user = AnonymousUser()
         request = _drf_request(raw)
-        # group_id="" is falsy, user is AnonymousUser (truthy)
-        # Hits: elif not group_id and user -> SAFE_METHODS -> True
         assert self.perm.has_permission(request, None) is True
 
 

@@ -1,10 +1,100 @@
 from __future__ import annotations
 
-from typing import Any
+import json
+from typing import TYPE_CHECKING, Any
+
+from django.contrib.auth.models import AnonymousUser  # noqa: TCH002
+from django.db.models import Q
 
 from papadapi.annotate.models import Annotation
 from papadapi.archive.models import MediaStore
-from papadapi.common.models import Group, Tags
+from papadapi.common.models import Group, Question, Tags
+
+if TYPE_CHECKING:
+    from papadapi.users.models import User
+
+
+def build_extra_group_response(raw_data: str | list | dict) -> list[dict[str, Any]]:
+    """Parse extra_group_response JSON and expand Question details for each answer."""
+    parsed = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+
+    if not parsed:
+        return []
+
+    answers = parsed.get("answers", []) if isinstance(parsed, dict) else []
+    if not answers:
+        return []
+
+    result: list[dict[str, Any]] = []
+    for answer in answers:
+        q = answer["question_id"]
+        question = Question.objects.get(id=q)
+        if question:
+            result.append(
+                {
+                    "question_id": q,
+                    "question": question.question,
+                    "question_type": question.question_type,
+                    "question_mandatory": question.question_mandatory,
+                    "response": answer["response"],
+                }
+            )
+    return result
+
+
+def build_group_filter(
+    user: User | AnonymousUser,
+    search_from: str | None,
+    search_collections: str | None,
+    group_param: str | None = None,
+) -> Q:
+    """Build a Q filter for group-based access control.
+
+    Shared by archive and annotation search views.  The ``group_param``
+    argument supports the annotation view's ``?group=<id>`` shorthand.
+    """
+    public_q = Q(group__in=Group.objects.filter(is_public=True, is_active=True))
+
+    if user.is_anonymous:
+        if (
+            search_from == "selected_collections"
+            and search_collections is not None
+        ):
+            group_list = search_collections.split(",")
+            return Q(group__in=Group.objects.filter(id__in=group_list))
+        # anonymous: default / all_collections / public all resolve to public
+        return public_q
+
+    # Authenticated user
+    my_q = Q(group__in=Group.objects.filter(users__in=[user]))
+
+    if search_from == "all_collections":
+        return public_q | my_q
+    if search_from == "my_collections":
+        return my_q
+    if search_from == "public":
+        return public_q
+    if search_from == "selected_collections" and search_collections is not None:
+        group_list = search_collections.split(",")
+        return Q(group__in=Group.objects.filter(id__in=group_list))
+
+    # No explicit search_from — check for ?group=<id> shorthand
+    if group_param:
+        return Q(
+            group_id=group_param,
+            group__in=Group.objects.filter(users__in=[user])
+            | Group.objects.filter(is_public=True, is_active=True),
+        )
+
+    # Default for authenticated users: all accessible collections
+    return public_q | my_q
+
+
+def is_truthy(val: Any) -> bool:
+    """Parse a form-data boolean (string "True"/"true"/"1" or actual bool)."""
+    if isinstance(val, bool):
+        return val
+    return str(val).lower() in ("true", "1", "yes")
 
 
 def recalculate_tag_count(tag_instance: Tags) -> None:

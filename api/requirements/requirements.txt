@@ -9,8 +9,6 @@ psycopg2-binary==2.9.9
 dj-database-url
 
 # Model tools
-django-model-utils
-django_unique_upload
 
 # REST API
 djangorestframework
@@ -47,4 +45,3 @@ structlog
 django-richtextfield
 
 # JSON-LD
-pyld

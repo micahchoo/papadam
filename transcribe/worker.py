@@ -14,6 +14,7 @@ from io import BytesIO
 import httpx
 import structlog
 import whisper
+from arq.connections import RedisSettings
 
 log = structlog.get_logger()
 
@@ -112,7 +113,9 @@ async def transcribe_media(ctx: dict, media_uuid: str) -> None:
 
 
 class WorkerSettings:
-    redis_settings_from_url = os.environ.get("REDIS_URL", "redis://redis:6379")
+    redis_settings = RedisSettings.from_dsn(
+        os.environ.get("REDIS_URL", "redis://redis:6379/0")
+    )
     functions = [transcribe_media]
     on_startup = lambda ctx: log.info("transcribe_worker_started")  # noqa: E731
     on_shutdown = lambda ctx: log.info("transcribe_worker_stopped")  # noqa: E731

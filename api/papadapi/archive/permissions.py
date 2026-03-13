@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from rest_framework.views import APIView
 
 from papadapi.common.models import Group
+from papadapi.common.permissions import user_can_access_group
 
 
 class IsArchiveCreateOrReadOnly(BasePermission):
@@ -22,13 +23,14 @@ class IsArchiveCreateOrReadOnly(BasePermission):
         if request.method == 'GET':
             group_id = request.query_params.get('group')
         else:
-            group_id = data["group"]
+            group_id = data.get("group")
+            if not group_id and request.method not in SAFE_METHODS:
+                self.message = "Missing required field: group"
+                return False
         user = request.user
         if group_id and user:
             group = Group.objects.get(id=group_id)
-            if request.method in SAFE_METHODS and group.is_public:
-                return True
-            return user in group.users.all()  # type: ignore[operator]  # TYPE_DEBT: view ensures authenticated user
+            return user_can_access_group(user, group, request.method in SAFE_METHODS)
         elif not group_id and user:  # this is a search function to allow
             return request.method in SAFE_METHODS
         else:
@@ -42,12 +44,15 @@ class IsArchiveCopyAllowed(BasePermission):
     def has_permission(self, request: Request, view: APIView) -> bool:
         if request.method == "PUT":
             data = request.data
-            from_group_id = data["from_group"]
-            to_group_id = data["to_group"]
+            from_group_id = data.get("from_group")
+            to_group_id = data.get("to_group")
+            if not from_group_id or not to_group_id:
+                self.message = "Missing required fields: from_group, to_group"
+                return False
             user = request.user
             if from_group_id and to_group_id and user:
                 group = Group.objects.get(id=to_group_id)
-                return user in group.users.all()  # type: ignore[operator]  # TYPE_DEBT: view ensures authenticated user
+                return user_can_access_group(user, group, is_safe_method=False)
             else:
                 self.message = "User or Group detail missing"
                 return False
@@ -60,14 +65,11 @@ class IsArchiveUpdateOrReadOnly(BasePermission):
     message = "You are not a member of the group to perform this action"
 
     def has_object_permission(self, request: Request, view: APIView, obj: Any) -> bool:
-        # Always allow GET, HEAD or OPTIONS requests.
-        if request.method in SAFE_METHODS:
-            return True
         # User must be a part of the group.
         group = obj.group
         user = request.user
         if group and user:
-            return user in group.users.all()
+            return user_can_access_group(user, group, request.method in SAFE_METHODS)
         else:
             self.message = "User or Group detail missing"
             return False

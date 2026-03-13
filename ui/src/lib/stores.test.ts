@@ -29,7 +29,7 @@ import {
 import type { User, Group, MediaStore, UIConfig } from '$lib/api';
 
 const MOCK_USER: User = {
-	id: 1,
+	id: '1',
 	username: 'alice',
 	first_name: 'Alice',
 	last_name: 'A'

@@ -2,8 +2,8 @@
 papadapi/queue.py — synchronous ARQ enqueue helpers for Django views.
 
 Django views are synchronous; ARQ's Redis pool is async.  These helpers wrap
-the async enqueue calls with asyncio.run() so views can fire-and-forget jobs
-without converting to async views.
+the async enqueue calls so views can fire-and-forget jobs without converting
+to async views.
 
 Usage:
     from papadapi.queue import enqueue, enqueue_after
@@ -15,6 +15,7 @@ Usage:
 """
 
 import asyncio
+import concurrent.futures
 from datetime import timedelta
 
 import structlog
@@ -23,6 +24,10 @@ from django.conf import settings
 
 log = structlog.get_logger(__name__)
 
+# Re-used across enqueue calls to avoid per-call TCP connection churn.
+_pool: ArqRedis | None = None
+_thread_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
 
 def _redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(
@@ -30,23 +35,40 @@ def _redis_settings() -> RedisSettings:
     )
 
 
+async def _get_pool() -> ArqRedis:
+    global _pool
+    if _pool is None:
+        _pool = await create_pool(_redis_settings())
+    return _pool
+
+
 async def _enqueue_async(
     function: str,
     *args: object,
     _defer_by: timedelta | None = None,
 ) -> str:
-    pool: ArqRedis = await create_pool(_redis_settings())
+    pool = await _get_pool()
+    job = await pool.enqueue_job(function, *args, _defer_by=_defer_by)
+    return job.job_id if job else ""
+
+
+def _run_async(coro: object) -> str:
+    """Run an async coroutine from sync context, handling already-running loops."""
     try:
-        job = await pool.enqueue_job(function, *args, _defer_by=_defer_by)
-        return job.job_id if job else ""
-    finally:
-        await pool.aclose()
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        # Inside an existing event loop (ASGI, tests with asyncio_mode="auto").
+        return _thread_executor.submit(asyncio.run, coro).result(timeout=30)  # type: ignore[arg-type]
+    return asyncio.run(coro)  # type: ignore[arg-type]
 
 
 def enqueue(function: str, *args: object) -> str:
     """Enqueue an ARQ job immediately. Returns the job ID."""
     try:
-        return asyncio.run(_enqueue_async(function, *args))
+        return _run_async(_enqueue_async(function, *args))
     except Exception as exc:
         log.error("enqueue_failed", function=function, error=str(exc))
         raise
@@ -66,7 +88,7 @@ def enqueue_after(
     """
     defer_by = delay if isinstance(delay, timedelta) else timedelta(seconds=delay)
     try:
-        return asyncio.run(
+        return _run_async(
             _enqueue_async(function, *args, _defer_by=defer_by)
         )
     except Exception as exc:

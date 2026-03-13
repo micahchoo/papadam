@@ -48,6 +48,7 @@ npm run test:all      # vitest run + playwright
 ```
 build/
 ├── index.html          ← SPA entry point (nginx try_files fallback target)
+├── service-worker.js   ← Workbox precache + runtime cache + Background Sync
 ├── _app/               ← hashed JS + CSS bundles
 ├── img/                ← static images
 └── favicon.png
@@ -67,6 +68,7 @@ This directory is mounted into the `papadam-ui` nginx container in production.
 | Components     | bits-ui 0.21 (headless, accessible)                   |
 | Media player   | HLS.js (audio + video, adaptive bitrate)              |
 | CRDT / offline | Y.js + y-indexeddb + y-websocket                      |
+| Service worker | Workbox (precache, runtime cache, Background Sync)    |
 | i18n           | Paraglide (message catalog in `messages/`)            |
 | Unit tests     | Vitest + @testing-library/svelte                      |
 | E2E tests      | Playwright (chromium + firefox + Pixel 5 mobile)      |

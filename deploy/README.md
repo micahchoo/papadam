@@ -51,6 +51,7 @@ Minimum required values:
 | `CRDT_SERVER_TOKEN` | Service-account JWT for CRDT persistence. Generate: `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `PUBLIC_API_URL` | Public HTTPS URL for the API, e.g. `https://papad.example.org` |
 | `PUBLIC_CRDT_URL` | Public WebSocket URL, e.g. `wss://papad.example.org/ws` |
+| `ADMIN_PASSWORD` | Password for the admin user created by `seed_prod` |
 | `DOMAIN` | Your domain (Caddy `webserver` profile only) |
 
 ---
@@ -148,7 +149,18 @@ All other paths fall through to `papadam-ui:80` (SPA with `try_files` → `index
 
 ---
 
-## Create admin user
+## Seed production data
+
+```bash
+docker compose exec api python manage.py seed_prod
+```
+
+Creates an admin superuser and a **Community** group with UIConfig. Idempotent — safe to re-run.
+
+Optional `SEED_` env vars in `service_config.env` customise the initial group:
+`SEED_GROUP_NAME`, `SEED_GROUP_LANGUAGE`, `SEED_BRAND_NAME`, `SEED_BRAND_PRIMARY`, `SEED_BRAND_ACCENT`.
+
+### Manual admin creation (alternative)
 
 ```bash
 docker exec -it papadam-api python manage-prod.py createsuperuser

@@ -9,43 +9,14 @@ import os
 import subprocess
 
 import structlog
-from django.conf import settings
-from minio.error import S3Error
 
 from papadapi.annotate.models import Annotation
 from papadapi.common.storage import (
     delete_minio_object,
-    extract_minio_domain,
-    minio_client,
+    upload_hls_folder,
 )
 
 log = structlog.get_logger(__name__)
-
-
-async def _upload_hls_folder(folder: str, remote_prefix: str) -> None:
-    """Upload every file produced by ffmpeg HLS output to MinIO, then remove locally."""
-    client = minio_client(
-        extract_minio_domain(settings.AWS_S3_ENDPOINT_URL),
-        settings.AWS_ACCESS_KEY_ID,
-        settings.AWS_SECRET_ACCESS_KEY,
-    )
-    bucket: str = settings.AWS_STORAGE_BUCKET_NAME
-
-    def _upload() -> None:
-        for root, _, files in os.walk(folder):
-            for fname in files:
-                local_path = os.path.join(root, fname)
-                remote_path = remote_prefix + fname
-                try:
-                    client.stat_object(bucket, remote_path)
-                    log.info("annotation_hls_upload_skipped", remote=remote_path,
-                             reason="already_exists")
-                except S3Error:
-                    client.fput_object(bucket, remote_path, local_path)
-                    log.info("annotation_hls_uploaded", remote=remote_path)
-                os.remove(local_path)
-
-    await asyncio.to_thread(_upload)
 
 
 # ── ARQ tasks ─────────────────────────────────────────────────────────────────
@@ -109,7 +80,7 @@ async def transcode_annotation_audio(ctx: dict, annotation_id: int) -> None:
         raise subprocess.CalledProcessError(returncode, "ffmpeg")
 
     remote_prefix = f"annotate/audio/{annotation_id}/"
-    await _upload_hls_folder(folder, remote_prefix)
+    await upload_hls_folder(folder, remote_prefix)
 
     raw_key = annotation.annotation_audio.name
     annotation.annotation_audio.name = f"{remote_prefix}{manifest_name}"
@@ -167,7 +138,7 @@ async def transcode_annotation_video(ctx: dict, annotation_id: int) -> None:
         raise subprocess.CalledProcessError(returncode, "ffmpeg")
 
     remote_prefix = f"annotate/video/{annotation_id}/"
-    await _upload_hls_folder(folder, remote_prefix)
+    await upload_hls_folder(folder, remote_prefix)
 
     raw_key = annotation.annotation_video.name
     annotation.annotation_video.name = f"{remote_prefix}{manifest_name}"

@@ -7,6 +7,8 @@ Import from here rather than duplicating in each app.
 
 from __future__ import annotations
 
+import asyncio
+import os
 from urllib.parse import urlparse
 
 import structlog as _structlog
@@ -39,6 +41,33 @@ def extract_minio_domain(url: str) -> str:
     return netloc
 
 _log = _structlog.get_logger(__name__)
+
+
+async def upload_hls_folder(folder: str, remote_prefix: str) -> None:
+    """Upload every file in *folder* to MinIO under *remote_prefix*.
+
+    Removes local files after upload.
+
+    ``fput_object`` is idempotent (overwrites), so we skip the former
+    ``stat_object`` existence check — it was a TOCTOU race with no benefit.
+    """
+    client = minio_client(
+        extract_minio_domain(settings.AWS_S3_ENDPOINT_URL),
+        settings.AWS_ACCESS_KEY_ID,
+        settings.AWS_SECRET_ACCESS_KEY,
+    )
+    bucket: str = settings.AWS_STORAGE_BUCKET_NAME
+
+    def _upload() -> None:
+        for root, _, files in os.walk(folder):
+            for fname in files:
+                local_path = os.path.join(root, fname)
+                remote_path = remote_prefix + fname
+                client.fput_object(bucket, remote_path, local_path)
+                _log.info("hls_uploaded", remote=remote_path)
+                os.remove(local_path)
+
+    await asyncio.to_thread(_upload)
 
 
 def delete_minio_object(key: str) -> None:

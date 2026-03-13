@@ -5,13 +5,17 @@ import datetime
 
 import pytest
 
+from papadapi.common.serializers import (
+    DailyStatsSerializer as UserStatsSerializer,
+)
+from papadapi.common.serializers import (
+    GroupTagSerializer,
+)
 from papadapi.conftest import GroupFactory, UserFactory
 from papadapi.users.serializers import (
-    GroupTagSerializer,
     UserMEApiSerializer,
     UsersAPIGroupSerializer,
     UserSerializer,
-    UserStatsSerializer,
 )
 
 

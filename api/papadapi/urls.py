@@ -30,18 +30,13 @@ from papadapi.archive.views import (
 )
 from papadapi.common.uiconfig_views import UIConfigView
 from papadapi.common.views import (
-    AddCustomQuestionFromGroupView,
-    AddUserFromGroupView,
+    GroupManagementViewSet,
     GroupTagGraphView,
     GroupViewSet,
     HealthCheck,
     InstanceGroupStats,
-    RemoveCustomQuestionFromGroupView,
-    RemoveUserFromGroupView,
     RuntimeConfigView,
     TagsViewSet,
-    UpdateCustomQuestionFromGroupView,
-    UpdateGroupViewSet,
 )
 from papadapi.importexport.views import (
     ExportGroupCreateListSet,
@@ -70,28 +65,7 @@ router.register(
 # Common
 router.register(r"tags", TagsViewSet, basename="TagsRoute")
 router.register(r"group", GroupViewSet, basename="GroupRoute")
-router.register(r"group", UpdateGroupViewSet, basename="UpdateGroupRoute")
-router.register(
-    r"group/remove_user", RemoveUserFromGroupView, basename="RemoveUserFromGroupRoute"
-)
-router.register(
-    r"group/add_user", AddUserFromGroupView, basename="AddUserToGroupRoute"
-)
-router.register(
-    r"group/remove_question",
-    RemoveCustomQuestionFromGroupView,
-    basename="RemoveQuestionFromGroupRoute",
-)
-router.register(
-    r"group/add_question",
-    AddCustomQuestionFromGroupView,
-    basename="AddQuestionToGroupRoute",
-)
-router.register(
-    r"group/update_question",
-    UpdateCustomQuestionFromGroupView,
-    basename="UpdateQuestionInGroupRoute",
-)
+router.register(r"group", GroupManagementViewSet, basename="GroupManagementRoute")
 router.register(
     r"group/taggraph", GroupTagGraphView, basename="GroupTagGraphRoute"
 )

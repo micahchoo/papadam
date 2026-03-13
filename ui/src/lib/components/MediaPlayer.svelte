@@ -37,6 +37,7 @@
 	let videoEl = $state<HTMLVideoElement | null>(null);
 	let audioEl = $state<HTMLAudioElement | null>(null);
 	let hlsHandle: HlsHandle | null = null;
+	let hlsError = $state('');
 
 	const isAudio = $derived(
 		src.startsWith('data:audio') || /\.(mp3|ogg|wav|flac|aac|m4a)(\?|$)/i.test(src)
@@ -46,11 +47,26 @@
 		/\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(src)
 	);
 
-	/** Parse "t=start,end" → [start, end] in seconds, or null if malformed. */
+	/** Parse "t=start,end" → [start, end] in seconds, or null if malformed.
+	 *  Accepts both decimal seconds (t=1.5,10) and MM:SS format (t=01:30,10:00). */
 	function parseMediaTarget(target: string): [number, number] | null {
-		const m = /^t=(\d+\.?\d*),(\d+\.?\d*)$/.exec(target);
-		if (!m?.[1] || !m[2]) return null;
-		return [parseFloat(m[1]), parseFloat(m[2])];
+		const clean = target.replace(/\s+/g, '').replace(/^t=/, '');
+		// Try MM:SS,MM:SS first
+		const mmss = /^(\d{1,2}):(\d{2}),(\d{1,2}):(\d{2})$/.exec(clean);
+		if (mmss?.[1] && mmss[2] && mmss[3] && mmss[4]) {
+			return [
+				parseInt(mmss[1]) * 60 + parseInt(mmss[2]),
+				parseInt(mmss[3]) * 60 + parseInt(mmss[4])
+			];
+		}
+		// Decimal seconds
+		const parts = clean.split(',').map(Number);
+		const start = parts[0];
+		const end = parts[1];
+		if (parts.length === 2 && start !== undefined && end !== undefined && !isNaN(start) && !isNaN(end)) {
+			return [start, end];
+		}
+		return null;
 	}
 
 	/** Image URL of the annotation whose time range covers the current position, or null. */
@@ -73,7 +89,10 @@
 		const el = isAudio ? audioEl : videoEl;
 		if (el && src) {
 			hlsHandle?.destroy();
-			hlsHandle = attachHls(el, src, qualityToStartLevel($defaultQuality));
+			hlsError = '';
+			hlsHandle = attachHls(el, src, qualityToStartLevel($defaultQuality), (msg) => {
+				hlsError = msg;
+			});
 		}
 		return () => {
 			hlsHandle?.destroy();
@@ -177,6 +196,9 @@
 					{$playerSkipSeconds[1]}s →
 				</button>
 			</div>
+			{#if hlsError}
+				<p class="mt-2 rounded bg-red-100 px-3 py-2 text-sm text-red-700" role="alert">{hlsError}</p>
+			{/if}
 		{/if}
 	{:else}
 		<video {controls} class="w-full bg-black"><track kind="captions" /></video>

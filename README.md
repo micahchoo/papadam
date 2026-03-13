@@ -11,7 +11,7 @@ Hard fork of [PLASMA/papad](https://gitlab.com/servelots/papad) by [Janastu/Serv
 
 | I want to...                  | Guide                                                                            |
 | ----------------------------- | -------------------------------------------------------------------------------- |
-| Deploy papadam on a server    | [SETUP.md](./SETUP.md) — step-by-step Docker deployment with Nginx Proxy Manager |
+| Deploy papadam on a server    | [SETUP.md](./SETUP.md) — step-by-step Docker deployment                          |
 | Run papadam on my own machine | [DEVELOPMENT.md](./DEVELOPMENT.md) — local dev with hot-reload                   |
 | Understand the architecture   | [ARCHITECTURE.md](./ARCHITECTURE.md) — system design, constraints, roadmap       |
 
@@ -29,6 +29,7 @@ Hard fork of [PLASMA/papad](https://gitlab.com/servelots/papad) by [Janastu/Serv
 | Exhibit builder with full-archive picker                            | —     | ✓          |
 | UIConfig per-group UI customisation (icon/voice/standard profiles)  | —     | ✓          |
 | Whisper auto-transcription                                          | —     | ✓ optional |
+| Service worker + offline upload queue + background sync              | —     | ✓          |
 | Automatic HTTPS (Caddy)                                             | —     | ✓          |
 | Architecture enforced by linter (import-linter + eslint-boundaries) | —     | ✓          |
 | 80% test coverage gate in CI                                        | —     | ✓          |
@@ -72,7 +73,7 @@ cd ui && npm install && npm run build && cd ..
 # 2. Create env file
 cp deploy/service_config.env.sample deploy/service_config.env
 # edit — minimum required: DJANGO_SECRET_KEY, POSTGRES_PASSWORD, MINIO_ROOT_USER,
-#         MINIO_ROOT_PASSWORD, CRDT_SERVER_TOKEN, PUBLIC_API_URL, PUBLIC_CRDT_URL
+#         MINIO_ROOT_PASSWORD, CRDT_SERVER_TOKEN, PUBLIC_API_URL, PUBLIC_CRDT_URL, ADMIN_PASSWORD
 
 cd deploy
 

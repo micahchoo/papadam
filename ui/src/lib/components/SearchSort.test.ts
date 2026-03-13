@@ -1,66 +1,18 @@
 /**
  * Unit tests for SearchSort.svelte
- *
- * Verifies search input rendering, sort dropdown options,
- * media type filter, and search-by toggle.
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import { writable } from 'svelte/store';
-import type { MediaStore, Group, User } from '$lib/api';
 
-// ── Mock stores ────────────────────────────────────────────────────────────────
-const mockSelectedGroupMedia = writable<MediaStore[]>([]);
-
-vi.mock('$lib/stores', () => ({
-	selectedGroupMedia: mockSelectedGroupMedia
-}));
+vi.mock('$lib/stores', async () => {
+	const { writable } = await import('svelte/store');
+	return { selectedGroupMedia: writable([]) };
+});
 
 import SearchSort from './SearchSort.svelte';
 
-const MOCK_GROUP: Group = {
-	id: 1,
-	name: 'Test',
-	description: '',
-	is_public: true,
-	is_active: true,
-	users: [],
-	extra_group_questions: [],
-	delete_wait_for: 0,
-	created_at: '2024-01-01T00:00:00Z',
-	updated_at: '2024-01-01T00:00:00Z'
-};
-
-function makeMedia(overrides: Partial<MediaStore> = {}): MediaStore {
-	return {
-		id: 1,
-		uuid: 'uuid-1',
-		name: 'Test Media',
-		description: '',
-		upload: null,
-		tags: [],
-		is_public: false,
-		group: MOCK_GROUP,
-		orig_name: 'test.mp4',
-		orig_size: 0,
-		file_extension: 'mp4',
-		media_processing_status: 'Yet to process',
-		created_at: '2024-01-01T00:00:00Z',
-		updated_at: '2024-01-01T00:00:00Z',
-		created_by: null,
-		transcript_vtt_url: '',
-		...overrides
-	};
-}
-
 describe('SearchSort', () => {
-	beforeEach(() => {
-		mockSelectedGroupMedia.set([]);
-	});
-
-	// ── Renders form controls ────────────────────────────────────────────────
-
 	it('renders a search input with placeholder', () => {
 		render(SearchSort);
 		expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
@@ -96,10 +48,7 @@ describe('SearchSort', () => {
 		expect(screen.getByText('Type:')).toBeInTheDocument();
 	});
 
-	// ── Adversarial ──────────────────────────────────────────────────────────
-
 	it('renders without error when store contains zero media items', () => {
-		mockSelectedGroupMedia.set([]);
 		render(SearchSort);
 		expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
 	});

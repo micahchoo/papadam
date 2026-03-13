@@ -1,23 +1,16 @@
 /**
  * Unit tests for EditMediaModal.svelte
- *
- * Verifies form field rendering, labels, button text,
- * and validation error display.
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 
-// ── Mock api ───────────────────────────────────────────────────────────────────
-const mockArchiveUpdate = vi.fn().mockResolvedValue({});
-
 vi.mock('$lib/api', () => ({
-	archive: {
-		update: mockArchiveUpdate
-	}
+	archive: { update: vi.fn().mockResolvedValue({}) }
 }));
 
 import EditMediaModal from './EditMediaModal.svelte';
+import { archive } from '$lib/api';
 
 describe('EditMediaModal', () => {
 	beforeEach(() => {
@@ -30,8 +23,6 @@ describe('EditMediaModal', () => {
 		mediaDescription: 'A description',
 		recordingUuid: 'uuid-123'
 	};
-
-	// ── Form fields ──────────────────────────────────────────────────────────
 
 	it('renders the Edit Media heading', () => {
 		render(EditMediaModal, { props: defaultProps });
@@ -58,8 +49,6 @@ describe('EditMediaModal', () => {
 		expect(descTextarea.value).toBe('A description');
 	});
 
-	// ── Validation ───────────────────────────────────────────────────────────
-
 	it('shows validation error when name is empty on submit', async () => {
 		render(EditMediaModal, {
 			props: { ...defaultProps, mediaName: '', mediaDescription: 'desc' }
@@ -76,10 +65,8 @@ describe('EditMediaModal', () => {
 		expect(screen.getByText('Please fill in all fields.')).toBeInTheDocument();
 	});
 
-	// ── Adversarial ──────────────────────────────────────────────────────────
-
 	it('shows API error message when update fails', async () => {
-		mockArchiveUpdate.mockRejectedValueOnce(new Error('Server Error'));
+		vi.mocked(archive.update).mockRejectedValueOnce(new Error('Server Error'));
 		render(EditMediaModal, { props: defaultProps });
 		await fireEvent.click(screen.getByText('Save Changes'));
 		await waitFor(() => {

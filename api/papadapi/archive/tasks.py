@@ -7,8 +7,12 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+from typing import TYPE_CHECKING, Any
 
 import structlog
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 from django.conf import settings
 from minio.error import S3Error
 
@@ -16,6 +20,8 @@ from papadapi.archive.models import MediaStore
 from papadapi.common.storage import extract_minio_domain, minio_client
 
 log = structlog.get_logger(__name__)
+
+_S = MediaStore.ProcessingStatus
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -25,6 +31,39 @@ async def _set_status(media: MediaStore, status: str) -> None:
     """Async helper: update media_processing_status and persist."""
     media.media_processing_status = status
     await media.asave(update_fields=["media_processing_status"])
+
+
+async def _run_ffprobe(
+    probe: asyncio.subprocess.Process,
+    media_id: int,
+    media: MediaStore,
+) -> str:
+    """Await ffprobe, validate output, and return the decoded stdout string.
+
+    Sets the media status to PROCESSING_ERROR and raises on failure.
+    """
+    stdout, stderr = await probe.communicate()
+    output = stdout.decode().strip()
+    if probe.returncode != 0 or not output:
+        await _set_status(media, _S.PROCESSING_ERROR)
+        log.error("ffprobe_failed", media_id=media_id, stderr=stderr.decode().strip())
+        raise RuntimeError(f"ffprobe failed for media {media_id}")
+    return output
+
+
+async def _parse_probe_output(  # type: ignore[return]  # ANN401: private helper
+    output: str,
+    parse_fn: Callable[[str], Any],
+    media_id: int,
+    media: MediaStore,
+) -> Any:
+    """Parse ffprobe *output* via *parse_fn*, setting error status on failure."""
+    try:
+        return parse_fn(output)
+    except ValueError:
+        await _set_status(media, _S.PROCESSING_ERROR)
+        log.error("ffprobe_parse_failed", media_id=media_id, output=output)
+        raise
 
 
 # ── tasks ─────────────────────────────────────────────────────────────────────
@@ -42,7 +81,7 @@ async def delete_media_post_schedule(ctx: dict, media_id: int) -> None:
 async def convert_to_hls(ctx: dict, media_id: int, output_folder: str) -> None:
     """ARQ task: transcode a video upload to adaptive HLS streams."""
     m = await MediaStore.objects.aget(id=media_id)
-    await _set_status(m, "Processing started")
+    await _set_status(m, _S.PROCESSING_STARTED)
     input_video = m.upload.url
 
     # Probe video resolution
@@ -56,8 +95,10 @@ async def convert_to_hls(ctx: dict, media_id: int, output_folder: str) -> None:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, _ = await probe.communicate()
-    width, height = map(int, stdout.decode().strip().split("x"))
+    output = await _run_ffprobe(probe, media_id, m)
+    width, height = await _parse_probe_output(
+        output, lambda s: tuple(map(int, s.split("x"))), media_id, m
+    )
 
     resolutions = [(640, 360), (842, 480), (1280, 720)]
     bitrates = ["800k", "1400k", "2800k"]
@@ -77,10 +118,10 @@ async def convert_to_hls(ctx: dict, media_id: int, output_folder: str) -> None:
     proc = await asyncio.create_subprocess_exec(*commands)
     returncode = await proc.wait()
     if returncode != 0:
-        await _set_status(m, "Processing error")
+        await _set_status(m, _S.PROCESSING_ERROR)
         raise subprocess.CalledProcessError(returncode, "ffmpeg")
 
-    await _set_status(m, "Processing completed")
+    await _set_status(m, _S.PROCESSING_COMPLETED)
 
     from papadapi.queue import enqueue_after  # local import to avoid circular
     enqueue_after("upload_to_storage", media_id, folder, delay=10)
@@ -89,7 +130,7 @@ async def convert_to_hls(ctx: dict, media_id: int, output_folder: str) -> None:
 async def convert_to_hls_audio(ctx: dict, media_id: int, output_folder: str) -> None:
     """ARQ task: transcode an audio upload to adaptive HLS streams."""
     m = await MediaStore.objects.aget(id=media_id)
-    await _set_status(m, "Processing started")
+    await _set_status(m, _S.PROCESSING_STARTED)
     input_audio = m.upload.url
 
     # Probe original bitrate
@@ -103,8 +144,8 @@ async def convert_to_hls_audio(ctx: dict, media_id: int, output_folder: str) -> 
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, _ = await probe.communicate()
-    original_bitrate = int(stdout.decode().strip())
+    output = await _run_ffprobe(probe, media_id, m)
+    original_bitrate = await _parse_probe_output(output, int, media_id, m)
 
     potential_bitrates = [64000, 128000, 256000]
     bitrates = [
@@ -127,10 +168,10 @@ async def convert_to_hls_audio(ctx: dict, media_id: int, output_folder: str) -> 
         )
         returncode = await proc.wait()
         if returncode != 0:
-            await _set_status(m, "Processing error")
+            await _set_status(m, _S.PROCESSING_ERROR)
             raise subprocess.CalledProcessError(returncode, "ffmpeg")
 
-    await _set_status(m, "Processing completed")
+    await _set_status(m, _S.PROCESSING_COMPLETED)
 
     from papadapi.queue import enqueue_after  # local import to avoid circular
     enqueue_after("upload_to_storage", media_id, folder, delay=10)
@@ -139,7 +180,7 @@ async def convert_to_hls_audio(ctx: dict, media_id: int, output_folder: str) -> 
 async def upload_to_storage(ctx: dict, media_id: int, folder_path: str) -> None:
     """ARQ task: upload a local HLS folder to MinIO/S3 object storage."""
     m = await MediaStore.objects.aget(id=media_id)
-    await _set_status(m, "Stream uploading")
+    await _set_status(m, _S.STREAM_UPLOADING)
 
     client = minio_client(
         extract_minio_domain(settings.AWS_S3_ENDPOINT_URL),
@@ -159,16 +200,6 @@ async def upload_to_storage(ctx: dict, media_id: int, folder_path: str) -> None:
                 rel_path = os.path.relpath(local_path, folder_path)
                 remote_path = os.path.join(target_prefix, rel_path).replace("\\", "/")
                 try:
-                    try:
-                        client.stat_object(bucket, remote_path)
-                        log.info(
-                            "storage_upload_skipped",
-                            path=remote_path,
-                            reason="already_exists",
-                        )
-                        continue
-                    except S3Error:
-                        pass
                     client.fput_object(bucket, remote_path, local_path)
                     log.info(
                         "storage_upload_complete",
@@ -184,6 +215,6 @@ async def upload_to_storage(ctx: dict, media_id: int, folder_path: str) -> None:
     is_error = await asyncio.to_thread(_upload_all)
 
     if not is_error:
-        await _set_status(m, "Stream completed")
+        await _set_status(m, _S.STREAM_COMPLETED)
     else:
-        await _set_status(m, "Stream upload error")
+        await _set_status(m, _S.STREAM_UPLOAD_ERROR)

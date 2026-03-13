@@ -2,9 +2,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { archive, exhibits } from '$lib/api';
+	import { archive, exhibits, isAxiosError } from '$lib/api';
 	import type { ExhibitBlock, ExhibitBlockType, MediaStore } from '$lib/api';
-	import axios from 'axios';
 	import { isAuthenticated, exhibitEnabled } from '$lib/stores';
 
 	const exhibitUuid = $derived($page.params['uuid'] ?? '');
@@ -108,7 +107,7 @@
 			pickerTotal = data.count;
 			if (reset && data.results[0]) selectedMediaUuid = data.results[0].uuid;
 		} catch (err: unknown) {
-			if (axios.isAxiosError(err) && !err.response) {
+			if (isAxiosError(err) && !err.response) {
 				blockActionError = 'Unable to reach the server.';
 			}
 			// keep previous results on non-network errors
@@ -132,7 +131,7 @@
 				saveSuccess = false;
 			}, 2_000);
 		} catch (err: unknown) {
-			if (axios.isAxiosError(err) && err.response?.data) {
+			if (isAxiosError(err) && err.response?.data) {
 				const data = err.response.data as Record<string, string[] | string>;
 				saveError = typeof data['detail'] === 'string' ? data['detail'] : 'Failed to save changes.';
 			} else {

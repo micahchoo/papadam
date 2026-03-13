@@ -19,14 +19,24 @@ from papadapi.annotate.permissions import (
     IsAnnotateUpdateOrReadOnly,
 )
 from papadapi.archive.models import MediaStore
-from papadapi.common.functions import create_or_update_tag, recalculate_tag_count
-from papadapi.common.models import Group, Tags
-from papadapi.common.serializers import CustomPageNumberPagination
+from papadapi.common.functions import (
+    build_group_filter,
+    create_or_update_tag,
+    recalculate_tag_count,
+)
+from papadapi.common.mixins import TagAddMixin, TagRemoveMixin
+from papadapi.common.models import Group
+from papadapi.common.serializers import (
+    CustomPageNumberPagination,
+)
+from papadapi.common.serializers import (
+    DailyStatsSerializer as AnnotationStatsSerializer,
+)
 from papadapi.queue import enqueue, enqueue_after
 from papadapi.users.permissions import IsSuperUser
 
 from .models import Annotation
-from .serializers import AnnotationSerializer, AnnotationStatsSerializer
+from .serializers import AnnotationSerializer
 
 
 class AnnotationCreateSet(
@@ -46,7 +56,6 @@ class AnnotationCreateSet(
         search_where = self.request.GET.get("searchWhere", None)
         search_from = self.request.GET.get("searchFrom", None)
         search_collections = self.request.GET.get("searchCollections", None)
-        group_query = None
 
         # By default search in name and description unless overridden
         if search_query:
@@ -60,44 +69,12 @@ class AnnotationCreateSet(
             type_query = Q(annotation_type=annotation_type)
             query = query & type_query if query else type_query
 
-        if self.request.user.is_anonymous:
-            group_query = Q(
-                group__in=Group.objects.filter(is_public=True, is_active=True)
-            )
-        else:
-            if search_from == "all_collections":
-                group_query = Q(
-                    group__in=Group.objects.filter(is_public=True, is_active=True)
-                ) | Q(group__in=Group.objects.filter(users__in=[self.request.user]))
-
-            elif search_from == "my_collections":
-                group_query = Q(
-                    group__in=Group.objects.filter(users__in=[self.request.user])
-                )
-            elif search_from == "public":
-                group_query = Q(
-                    group__in=Group.objects.filter(is_public=True, is_active=True)
-                )
-            elif (
-                search_from == "selected_collections"
-                and search_collections is not None
-            ):
-                group_list = search_collections.split(",")
-                group_query = Q(mediagroup__in=Group.objects.filter(id__in=group_list))
-            else:
-                # Support ?group=<id> shorthand from frontend
-                group_param = self.request.GET.get("group")
-                if group_param:
-                    group_query = Q(
-                        group_id=group_param,
-                        group__in=Group.objects.filter(users__in=[self.request.user])
-                        | Group.objects.filter(is_public=True, is_active=True),
-                    )
-                else:
-                    # Bare list: show all annotations from user's groups + public
-                    group_query = Q(
-                        group__in=Group.objects.filter(is_public=True, is_active=True)
-                    ) | Q(group__in=Group.objects.filter(users__in=[self.request.user]))
+        group_query = build_group_filter(
+            self.request.user,
+            search_from,
+            search_collections,
+            group_param=self.request.GET.get("group"),
+        )
 
         final_query = query & group_query if query else group_query
         if final_query:
@@ -208,90 +185,48 @@ class AnnotationRetreiveSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_destroy(self, instance: Annotation) -> None:
-        obj = self.get_object()
-        m = Annotation.objects.get(id=obj.id)
-        m.is_delete = True
-        m.save()
-        media = MediaStore.objects.get(uuid=m.media_reference_id)
+        instance.is_delete = True
+        instance.save()
+        media = MediaStore.objects.get(uuid=instance.media_reference_id)
         if media.group.delete_wait_for == 0:
-            enqueue_after("delete_annotate_post_schedule", m.id, delay=10)
+            enqueue_after("delete_annotate_post_schedule", instance.id, delay=10)
         else:
             enqueue_after(
                 "delete_annotate_post_schedule",
-                m.id,
+                instance.id,
                 delay=timedelta(days=media.group.delete_wait_for),
             )
 
 class AnnotationAddTag(
-    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
+    TagAddMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
 ):
-
-    """
-    Add Tag to an annotation
-    """
+    """Add Tag to an annotation."""
 
     queryset = Annotation.objects.filter(is_delete=False)
     serializer_class = AnnotationSerializer
     permission_classes = [IsAnnotateUpdateOrReadOnly]
     pagination_class = CustomPageNumberPagination
-
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
-
-    def get_object(self) -> Annotation:
-        obj = super().get_object()
-        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        data = request.data
-
-        obj = self.get_object()
-        m = Annotation.objects.get(id=obj.id)
-
-        tags = data.get("tags")
-        if tags:
-            for tag in tags:
-                tag_obj = create_or_update_tag(tag)
-                if tag_obj:
-                    m.tags.add(tag_obj)
-        serializer = AnnotationSerializer(m)
-        return Response(serializer.data)
 
 
 class AnnotationRemoveTag(
-    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet
+    TagRemoveMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
 ):
-
-    """
-    Remove a  Tag from an annotation
-    """
+    """Remove a Tag from an annotation."""
 
     queryset = Annotation.objects.filter(is_delete=False)
     serializer_class = AnnotationSerializer
     permission_classes = [IsAnnotateUpdateOrReadOnly]
     pagination_class = CustomPageNumberPagination
-
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
-
-    def get_object(self) -> Annotation:
-        obj = super().get_object()
-        return obj  # type: ignore[no-any-return]  # TYPE_DEBT: DRF get_object returns Any
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        data = request.data
-
-        obj = self.get_object()
-        m = Annotation.objects.get(id=obj.id)
-
-        tags = data.get("tags")
-        if tags:
-            for tag_id in tags:
-                t = Tags.objects.get(id=tag_id)
-                m.tags.remove(t)
-                recalculate_tag_count(t)
-        serializer = AnnotationSerializer(m)
-        return Response(serializer.data)
 
 
 class AnnotationByMediaRetreiveSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -356,7 +291,7 @@ class GroupAnnotationStats(
                 group=Group.objects.get(id=int(group_id))
             ).values_list("uuid", flat=True)
             base_annotation_query = (
-                Annotation.objects.filter(media_reference_id__in=list(base_data))
+                Annotation.objects.filter(media_reference_id__in=base_data)
                 .values("id")
                 .annotate(created_date=TruncDate("created_at"))
                 .order_by("created_date")

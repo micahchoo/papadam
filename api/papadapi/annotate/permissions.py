@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from rest_framework.views import APIView
 
 from papadapi.archive.models import MediaStore
+from papadapi.common.permissions import user_can_access_group
 
 _MEMBERSHIP_MSG = "User does not belong to the group. Cannot modify any data."
 
@@ -48,7 +49,10 @@ class IsAnnotateCreateOrReadOnly(BasePermission):
             if not archive_id:
                 archive_id = request.path.split("/")[-2]
         else:
-            archive_id = data["media_reference_id"]
+            archive_id = data.get("media_reference_id")
+            if not archive_id:
+                self.message = "Missing required field: media_reference_id"
+                return False
         if archive_id == "annotate" and request.method in SAFE_METHODS:
             return True
         media_uuid = _to_uuid(archive_id) if archive_id else None
@@ -65,14 +69,13 @@ class IsAnnotateCreateOrReadOnly(BasePermission):
         group = archive.group
         user = request.user
         if group and user:
-            if request.method in SAFE_METHODS and group.is_public:
-                return True
-            if user in group.users.all():  # type: ignore[operator]  # TYPE_DEBT: view ensures authenticated user
+            if user_can_access_group(user, group, request.method in SAFE_METHODS):
                 return True
             self.message = _MEMBERSHIP_MSG
             return False
         self.message = "User or Group detail missing"
         return False
+
 
 class IsAnnotateUpdateOrReadOnly(BasePermission):
     message = "You are not a member of the group to perform this action"
@@ -93,9 +96,7 @@ class IsAnnotateUpdateOrReadOnly(BasePermission):
         group = archive.group
         user = request.user
         if group and user:
-            if request.method in SAFE_METHODS and group.is_public:
-                return True
-            if user in group.users.all():  # type: ignore[operator]  # TYPE_DEBT: view ensures authenticated user
+            if user_can_access_group(user, group, request.method in SAFE_METHODS):
                 return True
             self.message = _MEMBERSHIP_MSG
             return False

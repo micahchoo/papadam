@@ -3,14 +3,12 @@ papadam ARQ worker
 
 Replaces Huey. All background tasks are registered here.
 Run with: python -m arq papadapi.worker.WorkerSettings
-
-Phase 1: infrastructure stub — task functions will be migrated from
-archive/tasks.py, annotate/tasks.py, and importexport/tasks.py in Phase 1c.
 """
 
 import os
 
 import structlog
+from arq.connections import RedisSettings
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "papadapi.config.production")
 os.environ.setdefault("DJANGO_CONFIGURATION", "Production")
@@ -51,7 +49,9 @@ async def shutdown(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    redis_settings_from_dsn = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+    redis_settings = RedisSettings.from_dsn(
+        os.environ.get("REDIS_URL", "redis://redis:6379/0")
+    )
     functions = [
         delete_annotate_post_schedule,
         transcode_annotation_audio,

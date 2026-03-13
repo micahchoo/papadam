@@ -1,11 +1,17 @@
 # Searching and sorting
 
-You can search and sort media within a group's archive.
+You can search and sort media and annotations.
 
 ## Getting there
 
 Open a group from the **Collections** page. The search and sort controls appear
 above the media list.
+
+## Media / Annotations toggle
+
+Use the **Media** | **Annotations** toggle to switch between searching the media archive
+and searching annotations across the group. When "Annotations" is selected, results come
+from the global annotations list with filtering by group, type, tag, and search text.
 
 ## Search by name
 
@@ -28,13 +34,17 @@ Use the **Sort** dropdown on the right to change the order:
 | **Name Ascending** | A → Z |
 | **Name Descending** | Z → A |
 
+## Global annotations page
+
+The **Annotations** link in the navigation bar opens a paginated, filterable view of
+all annotations. You can filter by group, annotation type, tag, and search text.
+
 ## What is not available yet
 
 The following search features are planned for a future release:
 
 - Search by description text
 - Search by annotation content
-- Filter by media type (audio / video / image) within a group view
 - Cross-group search
 
 <!-- TODO(loop): Screenshots need recapturing from papadam UI (current images are from upstream papad Vue UI) -->

@@ -56,6 +56,7 @@
 		mediaName = '';
 		mediaDescription = '';
 		tags = '';
+		if (previewUrl) URL.revokeObjectURL(previewUrl);
 		previewUrl = '';
 		uploadState = 'idle';
 		processingStatus = '';
@@ -64,6 +65,7 @@
 	function handleFileChange(event: Event) {
 		const file = (event.target as HTMLInputElement).files?.[0];
 		if (file) {
+			if (previewUrl) URL.revokeObjectURL(previewUrl);
 			previewUrl = URL.createObjectURL(file);
 			mediaFile = file;
 		}

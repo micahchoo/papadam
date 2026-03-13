@@ -26,16 +26,25 @@ try:
 except ImportError:  # pragma: no cover
     ARQ_AVAILABLE = False
 
+# Module-level lazy Redis connection pool — shared across requests.
+_redis_pool: "aioredis.Redis | None" = None
 
-async def _fetch_job_status(redis_url: str, job_id: str) -> str:
+
+def _get_redis_pool() -> "aioredis.Redis":
+    """Return a shared Redis connection pool, creating it on first call."""
+    global _redis_pool
+    if _redis_pool is None:
+        redis_url = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
+        _redis_pool = aioredis.from_url(redis_url)
+    return _redis_pool
+
+
+async def _fetch_job_status(job_id: str) -> str:
     """Return the ARQ job status string or 'not_found'."""
-    pool = aioredis.from_url(redis_url)
-    try:
-        job = Job(job_id, pool)
-        js = await job.status()
-        return js.value  # e.g. "queued", "in_progress", "complete", "not_found"
-    finally:
-        await pool.aclose()
+    pool = _get_redis_pool()
+    job = Job(job_id, pool)
+    js = await job.status()
+    return js.value  # e.g. "queued", "in_progress", "complete", "not_found"
 
 
 class JobStatusView(APIView):
@@ -56,9 +65,8 @@ class JobStatusView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        redis_url: str = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
         try:
-            job_status = async_to_sync(_fetch_job_status)(redis_url, job_id)
+            job_status = async_to_sync(_fetch_job_status)(job_id)
         except Exception as exc:  # noqa: BLE001 — external Redis call; any failure → graceful 404
             log.error("job_status_fetch_failed", job_id=job_id, error=str(exc))
             return Response(

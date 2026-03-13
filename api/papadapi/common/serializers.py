@@ -44,6 +44,33 @@ class GroupTagSerializer(serializers.Serializer):
     count = serializers.IntegerField()
 
 
+def _get_group_tags(group_id: int) -> list[dict[str, Any]]:
+    """Return serialized tag counts for a group, merging media and annotation tags."""
+    media_tags_count = (
+        MediaStore.objects.filter(group=group_id)
+        .annotate(count=Count("tags"))
+        .annotate(tag_id=F("tags__id"))
+        .values("tag_id", "tags__name", "count")
+        .order_by("-count")
+    )
+    annotation_tags_count = (
+        Annotation.objects.filter(
+            media_reference_id__in=MediaStore.objects.filter(
+                group=group_id
+            ).values_list("uuid", flat=True)
+        )
+        .values("tags")
+        .annotate(count=Count("tags"))
+        .annotate(tag_id=F("tags__id"))
+        .values("tag_id", "tags__name", "count")
+        .order_by("-count")
+    )
+    tags_count = get_final_tags_count(
+        list(media_tags_count), list(annotation_tags_count), count=True
+    )
+    return GroupTagSerializer(tags_count, many=True).data  # type: ignore[return-value]
+
+
 class GroupSerializer(serializers.ModelSerializer):
     users = UserSerializer(many=True, read_only=True)
     extra_group_questions = QuestionsSerializer(many=True)
@@ -80,29 +107,7 @@ class GroupSerializer(serializers.ModelSerializer):
         return Group.objects.get(id=obj.id).users.count()
 
     def get_tags(self, obj: Group) -> list[dict[str, Any]]:
-        media_tags_count = (
-            MediaStore.objects.filter(group=obj.id)
-            .annotate(count=Count("tags"))
-            .annotate(tag_id=F("tags__id"))
-            .values("tag_id", "tags__name", "count")
-            .order_by("-count")
-        )
-        annotation_tags_count = (
-            Annotation.objects.filter(
-                media_reference_id__in=list(
-                    MediaStore.objects.filter(group=obj.id)
-                )
-            )
-            .values("tags")
-            .annotate(count=Count("tags"))
-            .annotate(tag_id=F("tags__id"))
-            .values("tag_id", "tags__name", "count")
-            .order_by("-count")
-        )
-        tags_count = get_final_tags_count(
-            list(media_tags_count), list(annotation_tags_count), count=True
-        )
-        return GroupTagSerializer(tags_count, many=True).data  # type: ignore[return-value]
+        return _get_group_tags(obj.id)
 
 
 class UpdateGroupSerializer(serializers.ModelSerializer):
@@ -116,41 +121,24 @@ class UpdateGroupSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "is_active",
+            "is_public",
             "users",
             "extra_group_questions",
             "delete_wait_for",
             "tags",
-            "is_public",
             "created_at",
             "updated_at"
         )
 
     def get_tags(self, obj: Group) -> list[dict[str, Any]]:
-        media_tags_count = (
-            MediaStore.objects.filter(group=obj.id)
-            .annotate(count=Count("tags"))
-            .annotate(tag_id=F("tags__id"))
-            .values("tag_id", "tags__name", "count")
-            .order_by("-count")
-        )
-        annotation_tags_count = (
-            Annotation.objects.filter(
-                media_reference_id__in=list(
-                    MediaStore.objects.filter(group=obj.id)
-                )
-            )
-            .values("tags")
-            .annotate(count=Count("tags"))
-            .annotate(tag_id=F("tags__id"))
-            .values("tag_id", "tags__name", "count")
-            .order_by("-count")
-        )
-        tags_count = get_final_tags_count(
-            list(media_tags_count), list(annotation_tags_count), count=True
-        )
-        return GroupTagSerializer(tags_count, many=True).data  # type: ignore[return-value]
+        return _get_group_tags(obj.id)
 
 
-class GroupStatsSerializer(serializers.Serializer):
+class DailyStatsSerializer(serializers.Serializer):
     created_date = serializers.DateField()
     total = serializers.IntegerField()
+
+
+# Backward-compatible alias
+GroupStatsSerializer = DailyStatsSerializer

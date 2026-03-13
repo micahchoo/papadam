@@ -30,6 +30,7 @@ class MediaStoreSerializer(serializers.ModelSerializer):
             "file_extension",
             "media_processing_status",
             "is_public",
+            "extra_group_response",
             "transcript_vtt_url",
         )
         read_only_fields = (
@@ -38,8 +39,3 @@ class MediaStoreSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         depth = 1
-
-
-class MediaStatsSerializer(serializers.Serializer):
-    created_date = serializers.DateField()
-    total = serializers.IntegerField()

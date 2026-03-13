@@ -13,12 +13,18 @@ export interface HlsHandle {
 export function attachHls(
 	el: HTMLMediaElement,
 	url: string,
-	startLevel?: number
+	startLevel?: number,
+	onError?: (message: string) => void
 ): HlsHandle {
 	if (url.includes('.m3u8') && Hls.isSupported()) {
 		const hls = new Hls({
 			enableWorker: false,
 			startLevel: startLevel ?? -1
+		});
+		hls.on(Hls.Events.ERROR, (_event, data) => {
+			if (data.fatal) {
+				onError?.(`Playback error: ${data.type}`);
+			}
 		});
 		hls.loadSource(url);
 		hls.attachMedia(el);

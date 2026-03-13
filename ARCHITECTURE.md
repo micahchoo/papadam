@@ -563,7 +563,7 @@ are detailed in the Backend Constraints section above.
 | Image overlay annotations | Phase 3 | ✓ | |
 | Audio/video reply transcode | Phase 3 | ✓ | Full ARQ pipeline |
 | Whisper transcription | Phase 3 | ✓ (landed Phase 4) | Optional worker; VTT wired in player |
-| Service worker offline queue | Phase 3 | ☐ | Deferred; y-indexeddb covers basic offline |
+| Service worker offline queue | Phase 3 | ✓ | Workbox precache + runtime media/API cache + Background Sync upload queue + JWT refresh |
 | WCAG AA audit | Phase 3 | partial | high-contrast CSS profile + modal fixes shipped; full audit pending |
 | icon / voice profiles | Phase 4 | partial | CSS vars + UIConfig wired; full rendering → Phase 5 |
 | Block drag/keyboard reorder | Phase 4 | ☐ | Phase 5 |
@@ -601,16 +601,16 @@ because CRDT semantics must not control moderation state.
 - Threaded reply display in AnnotationViewer
 - Exhibit viewer + basic exhibit editor
 - ESLint + svelte-check + eslint-boundaries wired to CI
-- Vitest unit tests (155 tests, 97%+ line coverage) + Playwright E2E smoke
+- Vitest unit tests (189 tests, 97%+ line coverage) + Playwright E2E smoke
 - i18n skeleton (Paraglide, English catalog)
 - adapter-static SPA build → `ui/build/` served by nginx container
 
-### Phase 3 — Media depth + inclusivity
+### Phase 3 — Media depth + inclusivity ✓ COMPLETE
 - [x] Image overlay annotations during video/audio playback
 - [x] Audio + video reply annotation upload UI — raw upload + HLS transcode pipeline wired
 - [x] Whisper transcript display in media player
-- [ ] Service worker + offline annotation queue + background sync
-- [ ] WCAG AA audit + fixes
+- [x] Service worker + offline annotation queue + background sync (Workbox precache + runtime cache + Background Sync + auth token refresh)
+- [ ] WCAG AA audit + fixes (high-contrast profile shipped; full audit pending → Phase 5)
 
 ### Phase 4 — UIConfig wiring + exhibit gating ✓ COMPLETE
 - [x] UIConfig model (`common.UIConfig`, OneToOneField → Group) + `/api/v1/uiconfig/` endpoint
@@ -644,7 +644,6 @@ because CRDT semantics must not control moderation state.
 ### Phase 5 — Polish, depth, federation (future)
 
 Deferred from Phase 3:
-- [ ] Service worker + offline annotation queue + background sync
 - [ ] WCAG AA full audit + fixes (high-contrast profile shipped; full audit pending)
 
 Deferred from Phase 4:
@@ -678,15 +677,11 @@ Added `--scheme-bg` CSS custom property to `:root` and each `[data-color-scheme]
 `<main>` uses `bg-[var(--scheme-bg,#f3f4f6)]` instead of `bg-gray-100`. Warm, cool, and
 high-contrast schemes now visibly affect the content area background.
 
-### Reply threading limited to one level
+### ~~Reply threading limited to one level~~ RESOLVED (Launch Readiness Task 2)
 
-`AnnotationViewer.svelte:54-75` splits annotations into roots (`reply_to === null`) and
-replies (indexed by parent ID). Replies-to-replies are silently dropped — their parent ID
-won't match any root annotation, so they vanish without error. The backend allows
-arbitrary nesting via the `reply_to` FK.
-
-**Fix:** Either recurse the reply tree, or cap nesting at depth 1 server-side and
-document the constraint.
+Recursive `{#snippet annotationThread}` in `AnnotationViewer.svelte` renders the full
+reply tree up to `MAX_REPLY_DEPTH` (3 levels). Reply button hidden at max depth.
+Backend serializer validates `reply_to` existence, same-group membership, and depth limit.
 
 ### Dead stores in `stores.ts` -- FIXED (R32-B)
 

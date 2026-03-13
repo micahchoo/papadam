@@ -1,39 +1,34 @@
 /**
  * Unit tests for UploadMediaModal.svelte
- *
- * Verifies form field rendering, required fields, group name display,
- * and upload state transitions.
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
-import { writable } from 'svelte/store';
-import type { Group, MediaStore } from '$lib/api';
+import type { Group } from '$lib/api';
 
-// ── Mock api ───────────────────────────────────────────────────────────────────
 vi.mock('$lib/api', () => ({
 	archive: {
-		create: vi.fn().mockResolvedValue({
-			data: { uuid: 'new-uuid', job_id: null }
-		})
+		create: vi.fn().mockResolvedValue({ data: { uuid: 'new-uuid', job_id: null } })
 	}
 }));
 
-// ── Mock events ────────────────────────────────────────────────────────────────
 vi.mock('$lib/events', () => ({
 	pollJob: vi.fn(() => ({ stop: vi.fn() }))
 }));
 
-// ── Mock stores ────────────────────────────────────────────────────────────────
-const mockSelectedGroupDetails = writable<Group | null>(null);
-const mockGroupMediaList = writable<MediaStore[]>([]);
-
-vi.mock('$lib/stores', () => ({
-	selectedGroupDetails: mockSelectedGroupDetails,
-	groupMediaList: mockGroupMediaList
-}));
+vi.mock('$lib/stores', async () => {
+	const { writable } = await import('svelte/store');
+	return {
+		selectedGroupDetails: writable(null),
+		groupMediaList: writable([])
+	};
+});
 
 import UploadMediaModal from './UploadMediaModal.svelte';
+import { selectedGroupDetails } from '$lib/stores';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const set = (store: unknown, value: unknown) => (store as any).set(value);
 
 const MOCK_GROUP: Group = {
 	id: 1,
@@ -50,15 +45,10 @@ const MOCK_GROUP: Group = {
 
 describe('UploadMediaModal', () => {
 	beforeEach(() => {
-		mockSelectedGroupDetails.set(MOCK_GROUP);
-		mockGroupMediaList.set([]);
+		set(selectedGroupDetails, MOCK_GROUP);
 	});
 
-	const defaultProps = {
-		showUploadModal: true
-	};
-
-	// ── Form fields ──────────────────────────────────────────────────────────
+	const defaultProps = { showUploadModal: true };
 
 	it('renders the upload heading with group name', () => {
 		render(UploadMediaModal, { props: defaultProps });
@@ -91,22 +81,16 @@ describe('UploadMediaModal', () => {
 		expect(screen.getByText('Cancel')).toBeInTheDocument();
 	});
 
-	// ── Preview placeholder ──────────────────────────────────────────────────
-
 	it('shows No preview available when no file is selected', () => {
 		render(UploadMediaModal, { props: defaultProps });
 		expect(screen.getByText('No preview available')).toBeInTheDocument();
 	});
 
-	// ── Group name fallback ──────────────────────────────────────────────────
-
 	it('shows ellipsis when group details are null', () => {
-		mockSelectedGroupDetails.set(null);
+		set(selectedGroupDetails, null);
 		render(UploadMediaModal, { props: defaultProps });
 		expect(screen.getByText(/Upload Media to \.\.\./)).toBeInTheDocument();
 	});
-
-	// ── Adversarial ──────────────────────────────────────────────────────────
 
 	it('renders all form fields with empty values without crashing', () => {
 		render(UploadMediaModal, { props: defaultProps });

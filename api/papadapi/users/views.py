@@ -4,9 +4,11 @@ from rest_framework import generics, mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from papadapi.common.serializers import DailyStatsSerializer as UserStatsSerializer
+
 from .models import User
 from .permissions import IsSuperUser
-from .serializers import UserSerializer, UserStatsSerializer
+from .serializers import UserSerializer
 
 
 class SearchUserView(mixins.ListModelMixin, viewsets.GenericViewSet):

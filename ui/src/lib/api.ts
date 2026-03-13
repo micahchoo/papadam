@@ -14,7 +14,7 @@ import type { InternalAxiosRequestConfig } from 'axios';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface User {
-	id: number;
+	id: string;
 	username: string;
 	first_name: string;
 	last_name: string;
@@ -312,7 +312,8 @@ http.interceptors.response.use(
 			const refresh = localStorage.getItem('refresh_token');
 			if (refresh) {
 				try {
-					const { data } = await axios.post<{ access: string }>(`${baseURL}/auth/jwt/refresh/`, {
+					await ensureBaseUrl();
+					const { data } = await http.post<{ access: string }>('/auth/jwt/refresh/', {
 						refresh
 					});
 					localStorage.setItem('access_token', data.access);
@@ -543,3 +544,5 @@ export const importexport = {
 
 	listRequests: () => http.get<PaginatedResponse<IERequest>>('/api/v1/myierequests/')
 };
+
+export const isAxiosError = axios.isAxiosError;

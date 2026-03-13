@@ -29,6 +29,27 @@ class ExportGroupCreateListSet(
     def create(self, request: Request, *args: object, **kwargs: object) -> Response:
         data = request.data
         requested_by: User = self.request.user  # type: ignore[assignment]
+
+        # Verify the user has access to the requested resource
+        export_type = data.get("type")
+        export_id = data.get("id")
+        if export_type == "group" and export_id:
+            from papadapi.common.models import Group
+            from papadapi.common.permissions import user_can_access_group
+
+            try:
+                group = Group.objects.get(id=export_id)
+            except Group.DoesNotExist:
+                return Response(
+                    {"detail": "Group not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if not user_can_access_group(requested_by, group, is_safe_method=False):
+                return Response(
+                    {"detail": "You are not a member of this group."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         request_type = "export"
         ie_metadata = data
         ie = IERequest.objects.create(

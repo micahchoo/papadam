@@ -7,6 +7,7 @@ from django.db.models import Count, F, Q, Value
 from django.db.models.functions import TruncDate
 from django.shortcuts import redirect
 from rest_framework import generics, mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import (
     AllowAny,
     IsAuthenticatedOrReadOnly,
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 
 from papadapi.annotate.models import Annotation
 from papadapi.archive.models import MediaStore
-from papadapi.common.functions import get_final_tags_count, get_related_tags
+from papadapi.common.functions import get_final_tags_count, get_related_tags, is_truthy
 from papadapi.common.permissions import IsGroupOwnerMemberOrReadOnly
 from papadapi.common.serializers import CustomPageNumberPagination
 from papadapi.users.models import User
@@ -67,9 +68,9 @@ class TagsViewSet(
         )
         annotation_tags_count = (
             Annotation.objects.filter(
-                media_reference_id__in=list(
-                    MediaStore.objects.filter(group__in=selected_groups)
-                )
+                media_reference_id__in=MediaStore.objects.filter(
+                    group__in=selected_groups
+                ).values_list("uuid", flat=True)
             )
             .values("tags")
             .annotate(count=Count("tags"))
@@ -145,10 +146,11 @@ class GroupViewSet(
         return Response(serializer.data)
 
 
-class UpdateGroupViewSet(
+class GroupManagementViewSet(
     mixins.UpdateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-    """
-    List all tags
+    """Consolidated viewset for group mutation operations.
+
+    Handles: update group, add/remove user, add/remove/update custom question.
     """
 
     queryset = Group.objects.all()
@@ -160,75 +162,49 @@ class UpdateGroupViewSet(
 
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         data = request.data
-        obj = self.get_object()
+        g = self.get_object()
 
-        g = Group.objects.get(id=obj.id)
-        name = data.get("name", g.name)
-        description = data.get("description", g.description)
-        delete_wait_for = data.get("delete_wait_for", g.delete_wait_for)
-        is_public = data.get("is_public", g.is_public)
-        g.name = name
-        g.description = description
-        g.delete_wait_for = delete_wait_for
-        g.is_public = is_public
+        g.name = data.get("name", g.name)
+        g.description = data.get("description", g.description)
+        g.delete_wait_for = data.get("delete_wait_for", g.delete_wait_for)
+        g.is_public = data.get("is_public", g.is_public)
         g.save()
         if data["users"]:
             users = data["users"].split(",")
             if len(data["users"]) > 0:
                 for user in users:
                     u = User.objects.get(id=user)
-                    if u not in g.users.all():
-                        g.users.add(u)
+                    g.users.add(u)
         serializer = UpdateGroupSerializer(g)
         return Response(serializer.data)
 
-class AddUserFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
-    """
-    List all tags
-    """
-
-    queryset = Group.objects.all()
-    serializer_class = UpdateGroupSerializer
-    pagination_class = CustomPageNumberPagination
-    permission_classes = [IsGroupOwnerMemberOrReadOnly]
-    lookup_field = "id"
-    lookup_url_kwarg = "id"
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+    @action(
+        detail=False, methods=["put"],
+        url_path=r"add_user/(?P<id>[^/.]+)", url_name="add-user",
+    )
+    def add_user(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        self.kwargs["id"] = kwargs["id"]
         data = request.data
-        obj = self.get_object()
+        g = self.get_object()
 
-        g = Group.objects.get(id=obj.id)
         user = data["user"]
         u = User.objects.get(id=user)
-        if u not in g.users.all():
-            g.users.add(u)
+        g.users.add(u)
         serializer = UpdateGroupSerializer(g)
         return Response(serializer.data)
 
-
-class RemoveUserFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
-    """
-    List all tags
-    """
-
-    queryset = Group.objects.all()
-    serializer_class = UpdateGroupSerializer
-    pagination_class = CustomPageNumberPagination
-    permission_classes = [IsGroupOwnerMemberOrReadOnly]
-    lookup_field = "id"
-    lookup_url_kwarg = "id"
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+    @action(
+        detail=False, methods=["put"],
+        url_path=r"remove_user/(?P<id>[^/.]+)", url_name="remove-user",
+    )
+    def remove_user(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        self.kwargs["id"] = kwargs["id"]
         data = request.data
-        obj = self.get_object()
+        g = self.get_object()
 
-        g = Group.objects.get(id=obj.id)
         user = data["user"]
         u = User.objects.get(id=user)
-        if len(g.users.all()) > 1:
+        if g.users.count() > 1:
             g.users.remove(u)
             serializer = UpdateGroupSerializer(g)
             return Response(serializer.data)
@@ -243,57 +219,45 @@ class RemoveUserFromGroupView(
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-
-class RemoveCustomQuestionFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
-
-    """
-    Remove a custom question from group
-    """
-
-    queryset = Group.objects.all()
-    serializer_class = UpdateGroupSerializer
-    pagination_class = CustomPageNumberPagination
-    permission_classes = [IsGroupOwnerMemberOrReadOnly]
-    lookup_field = "id"
-    lookup_url_kwarg = "id"
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+    @action(
+        detail=False, methods=["put"],
+        url_path=r"remove_question/(?P<id>[^/.]+)",
+        url_name="remove-question",
+    )
+    def remove_question(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """Remove a custom question from group."""
+        self.kwargs["id"] = kwargs["id"]
         data = request.data
-        obj = self.get_object()
+        g = self.get_object()
 
-        g = Group.objects.get(id=obj.id)
         question_id = data["question_id"]
         question = Question.objects.get(id=question_id)
         g.extra_group_questions.remove(question)
-        if data["remove_existing_data"] == "True":
+        if is_truthy(data.get("remove_existing_data", False)):
             media_list = MediaStore.objects.filter(group=g)
+            modified_media: list[MediaStore] = []
             for media in media_list:
                 egr: list[dict[str, Any]] = media.extra_group_response or []
                 for resp in egr:
                     if question.id == int(resp["question_id"]):
                         egr.remove(resp)
-                    media.extra_group_response = egr
-                    media.save()
+                media.extra_group_response = egr
+                modified_media.append(media)
+            if modified_media:
+                MediaStore.objects.bulk_update(modified_media, ["extra_group_response"])
         serializer = UpdateGroupSerializer(g)
         return Response(serializer.data)
 
-
-class AddCustomQuestionFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
-
-    queryset = Group.objects.all()
-    serializer_class = UpdateGroupSerializer
-    pagination_class = CustomPageNumberPagination
-    permission_classes = [IsGroupOwnerMemberOrReadOnly]
-    lookup_field = "id"
-    lookup_url_kwarg = "id"
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+    @action(
+        detail=False, methods=["put"],
+        url_path=r"add_question/(?P<id>[^/.]+)",
+        url_name="add-question",
+    )
+    def add_question(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        self.kwargs["id"] = kwargs["id"]
         data = request.data
-        obj = self.get_object()
+        g = self.get_object()
 
-        g = Group.objects.get(id=obj.id)
         question = Question.objects.create(
             question=data["question"],
             question_mandatory=data["mandatory"],
@@ -301,8 +265,9 @@ class AddCustomQuestionFromGroupView(
         )
         question.save()
         g.extra_group_questions.add(question)
-        if data["add_default_value"] == "True":
+        if is_truthy(data.get("add_default_value", False)):
             media_list = MediaStore.objects.filter(group=g)
+            modified_media: list[MediaStore] = []
             for media in media_list:
                 egr: list[dict[str, Any]] = media.extra_group_response or []
                 egr.append(
@@ -315,27 +280,23 @@ class AddCustomQuestionFromGroupView(
                     }
                 )
                 media.extra_group_response = egr
-                media.save()
+                modified_media.append(media)
+            if modified_media:
+                MediaStore.objects.bulk_update(modified_media, ["extra_group_response"])
 
         serializer = UpdateGroupSerializer(g)
         return Response(serializer.data)
 
-
-class UpdateCustomQuestionFromGroupView(
-    mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
-
-    queryset = Group.objects.all()
-    serializer_class = UpdateGroupSerializer
-    pagination_class = CustomPageNumberPagination
-    permission_classes = [IsGroupOwnerMemberOrReadOnly]
-    lookup_field = "id"
-    lookup_url_kwarg = "id"
-
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+    @action(
+        detail=False, methods=["put"],
+        url_path=r"update_question/(?P<id>[^/.]+)",
+        url_name="update-question",
+    )
+    def update_question(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        self.kwargs["id"] = kwargs["id"]
         data = request.data
-        obj = self.get_object()
+        g = self.get_object()
 
-        g = Group.objects.get(id=obj.id)
         question_id = data["question_id"]
         question = data["question"]
         try:
@@ -347,13 +308,16 @@ class UpdateCustomQuestionFromGroupView(
         q.question = question if question else q.question
         q.save()
         media_list = MediaStore.objects.filter(group=g)
+        modified_media: list[MediaStore] = []
         for media in media_list:
             egr: list[dict[str, Any]] = media.extra_group_response or []
             for resp in egr:
                 if q.id == int(resp["question_id"]):
                     resp["question"] = q.question
-                media.extra_group_response = egr
-                media.save()
+            media.extra_group_response = egr
+            modified_media.append(media)
+        if modified_media:
+            MediaStore.objects.bulk_update(modified_media, ["extra_group_response"])
         serializer = UpdateGroupSerializer(g)
         return Response(serializer.data)
 
@@ -405,9 +369,9 @@ class GroupTagGraphView(viewsets.GenericViewSet, generics.RetrieveAPIView):
             )
             annotation_tags_count = (
                 Annotation.objects.filter(
-                    media_reference_id__in=list(
-                        MediaStore.objects.filter(group=group_id)
-                    )
+                    media_reference_id__in=MediaStore.objects.filter(
+                        group=group_id
+                    ).values_list("uuid", flat=True)
                 )
                 .values("tags")
                 .annotate(symbolSize=Count("tags"))

@@ -1,42 +1,34 @@
 /**
  * Unit tests for UploadAnnotationModal.svelte
- *
- * Verifies annotation type selector, file input visibility per type,
- * form validation, and error display.
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import { writable } from 'svelte/store';
-import type { Annotation, MediaStore, Group, AnnotationType, TimeRangeInput } from '$lib/api';
+import type { Annotation, MediaStore, Group } from '$lib/api';
 
-// ── Mock api ───────────────────────────────────────────────────────────────────
 vi.mock('$lib/api', () => ({
-	annotations: {
-		create: vi.fn().mockResolvedValue({ data: {} })
-	}
+	annotations: { create: vi.fn().mockResolvedValue({ data: {} }) }
 }));
 
-// ── Mock stores ────────────────────────────────────────────────────────────────
-const mockSelectedMediaDuration = writable<number | null>(120);
-const mockAllowedAnnotationTypes = writable<AnnotationType[]>([
-	'text',
-	'image',
-	'audio',
-	'video',
-	'media_ref'
-]);
-const mockTimeRangeInputMode = writable<TimeRangeInput>('slider');
-const mockPlaybackPosition = writable(0);
-
-vi.mock('$lib/stores', () => ({
-	selectedMediaDuration: mockSelectedMediaDuration,
-	allowedAnnotationTypes: mockAllowedAnnotationTypes,
-	timeRangeInputMode: mockTimeRangeInputMode,
-	playbackPosition: mockPlaybackPosition
-}));
+vi.mock('$lib/stores', async () => {
+	const { writable } = await import('svelte/store');
+	return {
+		selectedMediaDuration: writable(120),
+		allowedAnnotationTypes: writable(['text', 'image', 'audio', 'video', 'media_ref']),
+		timeRangeInputMode: writable('slider'),
+		playbackPosition: writable(0)
+	};
+});
 
 import UploadAnnotationModal from './UploadAnnotationModal.svelte';
+import {
+	selectedMediaDuration,
+	allowedAnnotationTypes,
+	timeRangeInputMode
+} from '$lib/stores';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const set = (store: unknown, value: unknown) => (store as any).set(value);
 
 const MOCK_GROUP: Group = {
 	id: 1,
@@ -72,10 +64,9 @@ const MOCK_RECORDING: MediaStore = {
 
 describe('UploadAnnotationModal', () => {
 	beforeEach(() => {
-		mockSelectedMediaDuration.set(120);
-		mockAllowedAnnotationTypes.set(['text', 'image', 'audio', 'video', 'media_ref']);
-		mockTimeRangeInputMode.set('slider');
-		mockPlaybackPosition.set(0);
+		set(selectedMediaDuration, 120);
+		set(allowedAnnotationTypes, ['text', 'image', 'audio', 'video', 'media_ref']);
+		set(timeRangeInputMode, 'slider');
 	});
 
 	const defaultProps = {
@@ -83,8 +74,6 @@ describe('UploadAnnotationModal', () => {
 		recording: MOCK_RECORDING,
 		annotations: [] as Annotation[]
 	};
-
-	// ── Form controls ────────────────────────────────────────────────────────
 
 	it('renders the Create New Annotation heading', () => {
 		render(UploadAnnotationModal, { props: defaultProps });
@@ -102,7 +91,7 @@ describe('UploadAnnotationModal', () => {
 	});
 
 	it('renders only allowed annotation types from store', () => {
-		mockAllowedAnnotationTypes.set(['text', 'image']);
+		set(allowedAnnotationTypes, ['text', 'image']);
 		render(UploadAnnotationModal, { props: defaultProps });
 		expect(screen.getByRole('option', { name: 'Text' })).toBeInTheDocument();
 		expect(screen.getByRole('option', { name: 'Image' })).toBeInTheDocument();
@@ -126,43 +115,39 @@ describe('UploadAnnotationModal', () => {
 		expect(screen.getByText('Cancel')).toBeInTheDocument();
 	});
 
-	// ── Time range input modes ───────────────────────────────────────────────
-
 	it('renders slider inputs in slider mode', () => {
-		mockTimeRangeInputMode.set('slider');
+		set(timeRangeInputMode, 'slider');
 		render(UploadAnnotationModal, { props: defaultProps });
 		expect(screen.getByLabelText('Start Time')).toBeInTheDocument();
 		expect(screen.getByLabelText('End Time')).toBeInTheDocument();
 	});
 
 	it('renders timestamp text inputs in timestamp mode', () => {
-		mockTimeRangeInputMode.set('timestamp');
+		set(timeRangeInputMode, 'timestamp');
 		render(UploadAnnotationModal, { props: defaultProps });
 		expect(screen.getByText('Time Range (MM:SS)')).toBeInTheDocument();
 	});
 
 	it('renders tap buttons in tap mode', () => {
-		mockTimeRangeInputMode.set('tap');
+		set(timeRangeInputMode, 'tap');
 		render(UploadAnnotationModal, { props: defaultProps });
 		expect(screen.getByText('Time Range')).toBeInTheDocument();
 		expect(screen.getByText(/Set start/)).toBeInTheDocument();
 		expect(screen.getByText(/Set end/)).toBeInTheDocument();
 	});
 
-	// ── Validation ───────────────────────────────────────────────────────────
-
 	it('shows error when submitting with zero time range', async () => {
 		render(UploadAnnotationModal, { props: defaultProps });
 		await fireEvent.click(screen.getByText('Create Annotation'));
 		await waitFor(() => {
-			expect(screen.getByText('Set a time range for the annotation.')).toBeInTheDocument();
+			expect(
+				screen.getByText('Set a time range for the annotation.')
+			).toBeInTheDocument();
 		});
 	});
 
-	// ── Adversarial ──────────────────────────────────────────────────────────
-
 	it('renders without error when duration is null', () => {
-		mockSelectedMediaDuration.set(null);
+		set(selectedMediaDuration, null);
 		render(UploadAnnotationModal, { props: defaultProps });
 		expect(screen.getByText('Create New Annotation')).toBeInTheDocument();
 	});

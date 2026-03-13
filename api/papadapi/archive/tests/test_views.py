@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from papadapi.archive.models import MediaStore
-from papadapi.common.models import Group, Question, Tags
+from papadapi.common.models import Question
 from papadapi.conftest import (
     GroupFactory,
     MediaStoreFactory,
@@ -241,8 +241,6 @@ class TestMediaStoreUploadFileView:
         user = UserFactory()
         group.users.add(user)
         media = MediaStoreFactory(group=group)
-        client = _auth_client_for(user)
-
         # The router-based URL for MediaStoreUploadFileView is not separately
         # registered; it shares the archive prefix. The upload endpoint is
         # registered via the MediaStoreCreateSet (list+create) not a separate

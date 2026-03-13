@@ -5,12 +5,6 @@ from papadapi.common.models import Group
 from papadapi.users.models import User
 
 
-class GroupTagSerializer(serializers.Serializer):
-    id = serializers.IntegerField(source="tag_id")
-    name = serializers.CharField(source="tags__name")
-    count = serializers.IntegerField()
-
-
 class UsersAPIGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
@@ -56,8 +50,3 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ("id", "username", "first_name", "last_name")
         read_only_fields = ("username",)
-
-
-class UserStatsSerializer(serializers.Serializer):
-    created_date = serializers.DateField()
-    total = serializers.IntegerField()

@@ -32,6 +32,7 @@ export default defineConfig({
 		conditions: ['browser'],
 		alias: {
 			$lib: '/src/lib',
+			'$app/stores': '/tests/mocks/app/stores.ts',
 			$app: '/.svelte-kit/runtime/app'
 		}
 	}

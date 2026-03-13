@@ -6,16 +6,20 @@ const mockAttachMedia = vi.fn();
 let mockIsSupported = true;
 let lastConstructorConfig: Record<string, unknown> | undefined;
 
+const mockOn = vi.fn();
+
 vi.mock('hls.js', () => {
 	const HlsMock = vi.fn().mockImplementation((config: Record<string, unknown>) => {
 		lastConstructorConfig = config;
 		return {
 			destroy: mockDestroy,
 			loadSource: mockLoadSource,
-			attachMedia: mockAttachMedia
+			attachMedia: mockAttachMedia,
+			on: mockOn
 		};
 	});
 	(HlsMock as any).isSupported = () => mockIsSupported;
+	(HlsMock as any).Events = { ERROR: 'hlsError' };
 	return { default: HlsMock };
 });
 
@@ -96,6 +100,32 @@ describe('attachHls', () => {
 		// Should not throw
 		handle.destroy();
 		expect(mockDestroy).not.toHaveBeenCalled();
+	});
+
+	it('calls onError with message when fatal HLS error occurs', () => {
+		const el = makeMockElement();
+		const onError = vi.fn();
+		attachHls(el, 'https://cdn.example.com/stream/master.m3u8', undefined, onError);
+
+		// Simulate a fatal error via the captured on() handler
+		const errorHandler = mockOn.mock.calls.find(
+			(call: unknown[]) => call[0] === 'hlsError'
+		)?.[1];
+		expect(errorHandler).toBeDefined();
+		errorHandler!('hlsError', { fatal: true, type: 'networkError' });
+		expect(onError).toHaveBeenCalledWith('Playback error: networkError');
+	});
+
+	it('does not call onError for non-fatal HLS errors', () => {
+		const el = makeMockElement();
+		const onError = vi.fn();
+		attachHls(el, 'https://cdn.example.com/stream/master.m3u8', undefined, onError);
+
+		const errorHandler = mockOn.mock.calls.find(
+			(call: unknown[]) => call[0] === 'hlsError'
+		)?.[1];
+		errorHandler!('hlsError', { fatal: false, type: 'networkError' });
+		expect(onError).not.toHaveBeenCalled();
 	});
 
 	// Adversarial: empty string URL

@@ -6,12 +6,14 @@
 		mediaName: string;
 		mediaDescription: string;
 		recordingUuid: string;
+		onSaved?: () => void;
 	}
 	let {
 		showEditModal = $bindable(),
 		mediaName = $bindable(),
 		mediaDescription = $bindable(),
-		recordingUuid
+		recordingUuid,
+		onSaved
 	}: Props = $props();
 
 	let error = $state('');
@@ -29,6 +31,7 @@
 		formData.append('description', mediaDescription);
 		try {
 			await archive.update(recordingUuid, formData);
+			onSaved?.();
 			showEditModal = false;
 		} catch {
 			error = 'Failed to update media.';

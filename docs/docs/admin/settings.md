@@ -40,7 +40,7 @@ Changes to colours apply immediately in your browser without a page reload.
 | Toggle | What it does |
 |---|---|
 | **Enable voice interaction** | Makes a microphone button always accessible for voice-first communities |
-| **Offline-first mode** | Prioritises offline storage and background sync (coming in a future release) |
+| **Offline-first mode** | Enables service worker precaching and background sync for offline uploads |
 
 ---
 

@@ -8,7 +8,16 @@ if TYPE_CHECKING:
     from rest_framework.request import Request
     from rest_framework.views import APIView
 
+    from papadapi.users.models import User
+
 from papadapi.common.models import Group
+
+
+def user_can_access_group(user: User, group: Group, is_safe_method: bool) -> bool:
+    """Return True if *user* may access *group* for the given method safety."""
+    if is_safe_method and group.is_public:
+        return True
+    return group.users.filter(pk=user.pk).exists()
 
 
 class ReadOnly(BasePermission):
@@ -23,7 +32,8 @@ class IsGroupOwnerMemberOrReadOnly(BasePermission):
         # Always allow GET, HEAD or OPTIONS requests.
         # User must be a part of the group.
 
-        group_id = request.META["PATH_INFO"].split("/")[-2]
+        kw = getattr(view, "kwargs", {})
+        group_id = kw.get("id") or kw.get("pk")
         user = request.user
         if group_id and user:
             try:
@@ -34,10 +44,7 @@ class IsGroupOwnerMemberOrReadOnly(BasePermission):
                     return True
                 self.message = "Group not found"
                 return False
-            if request.method in SAFE_METHODS and group.is_public:
-                return True
-            else:
-                return user in group.users.all()  # type: ignore[operator]  # TYPE_DEBT: view ensures authenticated user
+            return user_can_access_group(user, group, request.method in SAFE_METHODS)
         else:
             self.message = "User or Group detail missing"
             return False

@@ -4,7 +4,8 @@
  * Initialises a Y.js document for a given media item.
  * Provides typed accessors for the annotation map, metadata, and awareness.
  *
- * Architecture boundary: this module may only import from $lib/stores.
+ * Architecture boundary: this module may only import from $lib/stores and
+ * type-only imports from $lib/api.
  * Components access CRDT state via Svelte stores, not directly from here.
  */
 
@@ -12,10 +13,11 @@ import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
 import { playbackPosition } from '$lib/stores';
+import type { AnnotationType } from '$lib/api';
 
 // ── Types matching ARCHITECTURE.md CRDT schema ────────────────────────────────
 
-export type AnnotationType = 'text' | 'image' | 'audio' | 'video' | 'media_ref';
+export type { AnnotationType };
 
 export interface CRDTAnnotation {
 	uuid: string;

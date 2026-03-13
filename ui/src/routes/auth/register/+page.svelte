@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import axios from 'axios';
-	import { auth } from '$lib/api';
+	import { auth, isAxiosError } from '$lib/api';
 
 	let username = $state('');
 	let email = $state('');
@@ -28,7 +27,7 @@
 			});
 			await goto('/auth/login');
 		} catch (err: unknown) {
-			if (axios.isAxiosError(err)) {
+			if (isAxiosError(err)) {
 				if (!err.response) {
 					error = 'Unable to reach the server.';
 				} else {
