@@ -35,11 +35,7 @@
 # │                            secrets.token_hex(32))"                  │
 # └─────────────────────────────────────────────────────────────────────┘
 #
-# Profiles (enable in Portainer's stack config or via CLI):
-#   (none)         — postgres, redis, api, bg-app, crdt, ui
-#   minio          — MinIO object storage + auto bucket init
-#   docs           — MkDocs documentation site
-#   backup         — automated daily PostgreSQL backups
+# Services: postgres, redis, minio, api, bg-app, crdt, ui, docs, backup
 
 # ── Shared environment blocks ────────────────────────────────────────
 
@@ -108,7 +104,6 @@ services:
 
   minio:
     image: quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z
-    profiles: [minio]
     restart: unless-stopped
     command: server /data --console-address :9001
     environment:
@@ -125,7 +120,6 @@ services:
 
   minio-init:
     image: quay.io/minio/mc:RELEASE.2024-11-17T19-35-25Z
-    profiles: [minio]
     depends_on:
       minio:
         condition: service_healthy
@@ -205,11 +199,8 @@ services:
       timeout: 5s
       retries: 3
 
-  # ── Optional profiles ─────────────────────────────────────────────────
-
   docs:
     image: ghcr.io/micahchoo/papadam/docs:${IMAGE_TAG:-latest}
-    profiles: [docs]
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8001/ || wget -qO- http://localhost:8001/"]
@@ -219,7 +210,6 @@ services:
 
   backup:
     image: prodrigestivill/postgres-backup-local:16
-    profiles: [backup]
     restart: unless-stopped
     depends_on:
       postgres:
