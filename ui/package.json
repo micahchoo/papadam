@@ -43,7 +43,7 @@
 	"dependencies": {
 		"@inlang/paraglide-sveltekit": "^0.16.1",
 		"@types/dompurify": "^3.0.5",
-		"axios": "^1.7.7",
+		"axios": "^1.15.0",
 		"dompurify": "^3.3.1",
 		"hls.js": "^1.5.13",
 		"workbox-background-sync": "^7.4.0",
